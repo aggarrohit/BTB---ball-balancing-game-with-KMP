@@ -1,0 +1,15 @@
+# ============================================================
+# Copy this file to local.properties and fill in your values.
+# local.properties is gitignored — NEVER commit it.
+# ============================================================
+
+# Android SDK path (filled automatically by Android Studio)
+sdk.dir=/path/to/your/Android/sdk
+
+# Firebase Realtime Database URL
+# Found in: Firebase Console → Your Project → Realtime Database → Data tab
+FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.firebaseio.com
+
+# Firebase Project ID
+# Found in: Firebase Console → Project Settings → General
+FIREBASE_PROJECT_ID=your-project-id

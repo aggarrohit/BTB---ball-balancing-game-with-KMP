@@ -10,6 +10,10 @@ local.properties
 captures
 .externalNativeBuild
 .cxx
+
+# Firebase config files — never commit these
+google-services.json
+GoogleService-Info.plist
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
