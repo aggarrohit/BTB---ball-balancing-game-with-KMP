@@ -7,5 +7,5 @@ CURRENT_PROJECT_VERSION=1
 MARKETING_VERSION=1.0
 
 // Firebase config — fill in your values (this file is gitignored if sensitive; use Config.xcconfig.template as the committed version)
-FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.firebaseio.com
-FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_DATABASE_URL=https://balance-the-ball-2f0a8-default-rtdb.europe-west1.firebasedatabase.app/
+FIREBASE_PROJECT_ID=balance-the-ball-2f0a8

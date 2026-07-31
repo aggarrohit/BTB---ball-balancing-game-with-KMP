@@ -1,6 +1,6 @@
 package com.rohit.balancetheball.data.repository
 
-import kotlinx.datetime.Clock
+import com.rohit.balancetheball.core.util.currentTimeMillis
 import com.rohit.balancetheball.data.remote.FirebaseUserDataSource
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.repository.UserRepository
@@ -14,7 +14,7 @@ class UserRepositoryImpl(
         if (existing != null) {
             throw IllegalStateException("Username '$username' is already taken")
         }
-        val now = Clock.System.now().toEpochMilliseconds()
+        val now = currentTimeMillis()
         val user = User(username = username, createdAt = now)
         dataSource.createUser(user)
         user
