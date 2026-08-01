@@ -45,6 +45,9 @@ kotlin {
             implementation(libs.compose.uiTooling)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services.auth)
+            implementation(libs.googleid)
             // Firebase BOM provides version constraints for all Firebase Android artifacts
             implementation(project.dependencies.platform(libs.firebase.bom))
         }
@@ -59,6 +62,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.gitlive.firebase.database)
             implementation(libs.gitlive.firebase.common)
+            implementation(libs.gitlive.firebase.auth)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
         }

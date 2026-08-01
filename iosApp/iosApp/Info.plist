@@ -10,5 +10,19 @@
 	<string>balance-the-ball-2f0a8</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Balance The Ball uses motion sensors to move the ball and count your steps.</string>
+	<!--
+	  Google Sign-In redirect URL scheme. Once Google Sign-In is enabled in the Firebase Console
+	  and GoogleService-Info.plist is re-downloaded, copy its REVERSED_CLIENT_ID value in below
+	  (replacing the placeholder) — without this, the OAuth redirect back into the app will hang.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>REPLACE_WITH_REVERSED_CLIENT_ID</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

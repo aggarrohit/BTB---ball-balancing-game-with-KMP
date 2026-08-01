@@ -4,11 +4,11 @@ import com.rohit.balancetheball.domain.model.User
 
 interface UserRepository {
     /**
-     * Logs into an existing user (updating lastLoginAt) or creates a new one
-     * if the username is not taken yet. Never fails just because the username exists.
+     * Looks up the profile already claimed for [uid], bumping lastLoginAt as a side effect if found.
+     * Null means this uid hasn't claimed a username yet.
      */
-    suspend fun createAccount(username: String): Result<User>
+    suspend fun resolveProfile(uid: String): Result<User?>
 
-    /** Returns null if no user with the given username exists. */
-    suspend fun getUser(username: String): Result<User?>
+    /** Claims [username] for [uid]. Fails if the username is already taken by someone else. */
+    suspend fun claimUsername(uid: String, username: String, email: String?): Result<User>
 }

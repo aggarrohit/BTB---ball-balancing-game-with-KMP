@@ -10,8 +10,12 @@ object AppConfig {
     var firebaseDatabaseUrl: String = ""
     var firebaseProjectId: String = ""
 
-    fun init(databaseUrl: String, projectId: String) {
+    /** Web OAuth client ID for Google Sign-In (Android only — iOS reads its own from GoogleService-Info.plist). */
+    var googleWebClientId: String = ""
+
+    fun init(databaseUrl: String, projectId: String, googleWebClientId: String = "") {
         firebaseDatabaseUrl = databaseUrl
         firebaseProjectId = projectId
+        this.googleWebClientId = googleWebClientId
     }
 }

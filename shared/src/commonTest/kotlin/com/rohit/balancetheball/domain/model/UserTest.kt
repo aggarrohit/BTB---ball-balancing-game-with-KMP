@@ -6,22 +6,24 @@ import kotlin.test.assertEquals
 class UserTest {
 
     @Test
-    fun `user holds username and createdAt`() {
-        val user = User(username = "TestPlayer", createdAt = 1000L)
+    fun `user holds uid, username and createdAt`() {
+        val user = User(uid = "uid-1", username = "TestPlayer", createdAt = 1000L)
+        assertEquals("uid-1", user.uid)
         assertEquals("TestPlayer", user.username)
         assertEquals(1000L, user.createdAt)
     }
 
     @Test
-    fun `user defaults createdAt to zero`() {
-        val user = User(username = "Player")
+    fun `user defaults createdAt and email`() {
+        val user = User(uid = "uid-1", username = "Player")
         assertEquals(0L, user.createdAt)
+        assertEquals(null, user.email)
     }
 
     @Test
-    fun `users with same username and timestamp are equal`() {
-        val a = User("Player", 999L)
-        val b = User("Player", 999L)
+    fun `users with same fields are equal`() {
+        val a = User(uid = "uid-1", username = "Player", createdAt = 999L)
+        val b = User(uid = "uid-1", username = "Player", createdAt = 999L)
         assertEquals(a, b)
     }
 }

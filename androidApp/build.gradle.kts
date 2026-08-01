@@ -47,6 +47,11 @@ android {
             "FIREBASE_PROJECT_ID",
             "\"${localProps.getProperty("FIREBASE_PROJECT_ID", "")}\""
         )
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
+        )
     }
     packaging {
         resources {

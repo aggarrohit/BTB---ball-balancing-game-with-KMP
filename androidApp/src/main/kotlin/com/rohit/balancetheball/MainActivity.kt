@@ -17,7 +17,8 @@ class MainActivity : ComponentActivity() {
         // Initialize config from BuildConfig (values injected from local.properties)
         AppConfig.init(
             databaseUrl = BuildConfig.FIREBASE_DATABASE_URL,
-            projectId = BuildConfig.FIREBASE_PROJECT_ID
+            projectId = BuildConfig.FIREBASE_PROJECT_ID,
+            googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
         )
         AndroidSensorContext.init(applicationContext)
 

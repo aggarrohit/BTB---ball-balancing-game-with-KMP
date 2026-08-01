@@ -4,10 +4,10 @@ import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.repository.UserRepository
 
 /**
- * Validates the username and delegates account creation to [UserRepository].
+ * Validates a chosen username and delegates claiming it (for an already-signed-in uid) to [UserRepository].
  * All business rules for username validity live here.
  */
-class CreateAccountUseCase(private val repository: UserRepository) {
+class ClaimUsernameUseCase(private val repository: UserRepository) {
 
     companion object {
         const val MIN_USERNAME_LENGTH = 3
@@ -15,13 +15,13 @@ class CreateAccountUseCase(private val repository: UserRepository) {
         private val VALID_USERNAME_REGEX = Regex("^[a-zA-Z0-9_]+$")
     }
 
-    suspend operator fun invoke(username: String): Result<User> {
+    suspend operator fun invoke(uid: String, username: String, email: String?): Result<User> {
         val trimmed = username.trim()
         val validationError = validate(trimmed)
         if (validationError != null) {
             return Result.failure(IllegalArgumentException(validationError))
         }
-        return repository.createAccount(trimmed)
+        return repository.claimUsername(uid, trimmed, email)
     }
 
     private fun validate(username: String): String? = when {
