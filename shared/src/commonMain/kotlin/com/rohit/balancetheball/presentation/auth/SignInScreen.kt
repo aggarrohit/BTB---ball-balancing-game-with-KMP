@@ -29,7 +29,8 @@ import com.rohit.balancetheball.domain.model.AuthUser
 @Composable
 fun SignInScreen(
     onSignedIn: (AuthUser) -> Unit,
-    viewModel: AuthViewModel = viewModel {
+    navKey: Long = 0L,
+    viewModel: AuthViewModel = viewModel(key = navKey.toString()) {
         // Manual dependency wiring — swap in a DI framework when needed
         AuthViewModel(FirebaseAuthRepository())
     }

@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.data.remote.FirebaseUserDataSource
 import com.rohit.balancetheball.data.repository.UserRepositoryImpl
 import com.rohit.balancetheball.domain.model.AuthUser
+import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.usecase.ClaimUsernameUseCase
 
 private fun suggestUsername(displayName: String?): String =
@@ -24,7 +25,7 @@ private fun suggestUsername(displayName: String?): String =
 @Composable
 fun UsernameScreen(
     authUser: AuthUser,
-    onUsernameClaimed: (username: String) -> Unit,
+    onUsernameClaimed: (user: User) -> Unit,
     viewModel: UsernameViewModel = viewModel {
         // Manual dependency wiring — swap in a DI framework when needed
         val dataSource = FirebaseUserDataSource()
@@ -38,7 +39,7 @@ fun UsernameScreen(
     LaunchedEffect(uiState) {
         val state = uiState
         if (state is UsernameUiState.Success) {
-            onUsernameClaimed(state.username)
+            onUsernameClaimed(state.user)
         }
     }
 

@@ -11,6 +11,26 @@
       "$username": {
         ".write": "auth != null && ((!data.exists() && newData.val() === auth.uid) || (data.exists() && data.val() === auth.uid))"
       }
+    },
+    "rooms": {
+      ".read": "auth != null",
+      "$code": {
+        ".write": "auth != null && !data.exists() && newData.child('hostUid').val() === auth.uid && newData.child('status').val() === 'waiting' && newData.child('maxPlayers').val() > 0 && newData.child('maxPlayers').val() <= 10 && newData.child('targetSteps').val() > 0",
+        "status": {
+          ".write": "auth != null && data.parent().child('players').child(auth.uid).exists() && ((data.val() === 'waiting' && newData.val() === 'in_progress') || (data.val() === 'in_progress' && newData.val() === 'finished') || (data.val() === 'finished' && newData.val() === 'waiting'))"
+        },
+        "winnerUid": {
+          ".write": "auth != null && data.parent().child('players').child(auth.uid).exists() && (!data.exists() || newData.val() === null)"
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && (data.exists() || data.parent().parent().child('status').val() === 'waiting')",
+            "isEliminated": {
+              ".write": "auth != null && auth.uid === $uid && (data.val() != true || data.parent().parent().parent().child('status').val() === 'waiting')"
+            }
+          }
+        }
+      }
     }
   }
 }

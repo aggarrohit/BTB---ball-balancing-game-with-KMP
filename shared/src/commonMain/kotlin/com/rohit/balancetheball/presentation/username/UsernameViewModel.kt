@@ -20,7 +20,7 @@ class UsernameViewModel(
             _uiState.value = UsernameUiState.Loading
             claimUsernameUseCase(uid, username, email)
                 .onSuccess { user ->
-                    _uiState.value = UsernameUiState.Success(user.username)
+                    _uiState.value = UsernameUiState.Success(user)
                 }
                 .onFailure { error ->
                     _uiState.value = UsernameUiState.Error(
