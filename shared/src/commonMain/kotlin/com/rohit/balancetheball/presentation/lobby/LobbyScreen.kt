@@ -19,6 +19,7 @@ import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
 import com.rohit.balancetheball.domain.usecase.JoinRoomUseCase
+import com.rohit.balancetheball.domain.model.Room.Companion.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
 
 private enum class LobbyTab { CREATE, JOIN }
 
@@ -64,13 +65,14 @@ fun LobbyScreen(
 @Composable
 private fun LobbyForm(
     uiState: LobbyUiState,
-    onCreateRoom: (maxPlayers: Int, targetSteps: Int) -> Unit,
+    onCreateRoom: (maxPlayers: Int, targetSteps: Int, progressValidDistancePercent: Int) -> Unit,
     onJoinRoom: (code: String) -> Unit,
     onDismissError: () -> Unit
 ) {
     var tab by remember { mutableStateOf(LobbyTab.CREATE) }
     var maxPlayers by remember { mutableStateOf(2) }
     var targetSteps by remember { mutableStateOf("50") }
+    var balanceThresholdPercent by remember { mutableStateOf(DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT.toString()) }
     var joinCode by remember { mutableStateOf("") }
     val isLoading = uiState is LobbyUiState.Loading
 
@@ -124,9 +126,22 @@ private fun LobbyForm(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    OutlinedTextField(
+                        value = balanceThresholdPercent,
+                        onValueChange = { balanceThresholdPercent = it.filter(Char::isDigit).take(3) },
+                        label = { Text("Balance threshold %") },
+                        supportingText = { Text("Steps only count while the ball stays within this % of center") },
+                        singleLine = true,
+                        enabled = !isLoading,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    val thresholdValue = balanceThresholdPercent.toIntOrNull() ?: 0
                     Button(
-                        onClick = { onCreateRoom(maxPlayers, targetSteps.toIntOrNull() ?: 0) },
-                        enabled = !isLoading && (targetSteps.toIntOrNull() ?: 0) > 0,
+                        onClick = { onCreateRoom(maxPlayers, targetSteps.toIntOrNull() ?: 0, thresholdValue) },
+                        enabled = !isLoading && (targetSteps.toIntOrNull() ?: 0) > 0 &&
+                            thresholdValue in 1..100,
                         modifier = Modifier.fillMaxWidth().height(52.dp)
                     ) {
                         if (isLoading) {
@@ -228,6 +243,10 @@ private fun WaitingRoomContent(room: Room, onBack: () -> Unit) {
             )
             Text(
                 text = "Target: ${room.targetSteps} steps to win",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = "Balance threshold: ${room.progressValidDistancePercent}%",
                 style = MaterialTheme.typography.bodyMedium
             )
             TextButton(onClick = onBack) { Text("Cancel") }

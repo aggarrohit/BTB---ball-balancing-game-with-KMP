@@ -14,9 +14,10 @@ class RoomRepositoryImpl(
         hostUid: String,
         hostUsername: String,
         maxPlayers: Int,
-        targetSteps: Int
+        targetSteps: Int,
+        progressValidDistancePercent: Int
     ): Result<String> = runCatching {
-        dataSource.createRoom(hostUid, hostUsername, maxPlayers, targetSteps)
+        dataSource.createRoom(hostUid, hostUsername, maxPlayers, targetSteps, progressValidDistancePercent)
     }
 
     override suspend fun joinRoom(code: String, uid: String, username: String): Result<Unit> = runCatching {

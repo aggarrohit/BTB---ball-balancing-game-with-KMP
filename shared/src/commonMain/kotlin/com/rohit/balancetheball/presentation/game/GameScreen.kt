@@ -158,7 +158,8 @@ fun GameScreen(
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Distance: ${(uiState.distanceFraction * 100).roundToInt()}%" +
+                text = "Distance: ${(uiState.distanceFraction * 100).roundToInt()}% " +
+                    "(threshold ${uiState.progressValidDistancePercent}%)" +
                     if (uiState.isEliminated) " — off the table" else "",
                 style = MaterialTheme.typography.bodyMedium
             )

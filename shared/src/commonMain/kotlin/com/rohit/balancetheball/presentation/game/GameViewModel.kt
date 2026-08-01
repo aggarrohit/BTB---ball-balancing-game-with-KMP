@@ -27,9 +27,6 @@ private const val MAX_DT_SECONDS = 0.1f // clamp huge gaps (e.g. after backgroun
 private const val SENSITIVITY_PX_PER_S2_PER_DEGREE = 30f
 private const val DAMPING_RETAINED_PER_SECOND = 0.35f
 
-/** Steps only count toward progress while the ball stays within this fraction of the table's half-extents. Tune after playtesting. */
-const val PROGRESS_VALID_DISTANCE_FRACTION = 0.6f
-
 class GameViewModel(
     private val roomCode: String,
     private val uid: String,
@@ -56,6 +53,7 @@ class GameViewModel(
     private var localIsEliminated = false
     private var hasSeededFromRoom = false
     private var hasClaimedVictory = false
+    private var progressValidDistancePercent = Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
 
     init {
         viewModelScope.launch {
@@ -124,7 +122,8 @@ class GameViewModel(
         val delta = rawCount - lastRawStepCount
         lastRawStepCount = rawCount
 
-        if (delta > 0 && !localIsEliminated && _uiState.value.distanceFraction <= PROGRESS_VALID_DISTANCE_FRACTION) {
+        val progressValidDistanceFraction = progressValidDistancePercent / 100f
+        if (delta > 0 && !localIsEliminated && _uiState.value.distanceFraction <= progressValidDistanceFraction) {
             val targetSteps = _uiState.value.targetSteps
             localValidSteps = if (targetSteps > 0) (localValidSteps + delta).coerceAtMost(targetSteps) else localValidSteps + delta
             viewModelScope.launch { roomRepository.updateValidSteps(roomCode, uid, localValidSteps) }
@@ -139,6 +138,8 @@ class GameViewModel(
 
     private fun onRoomUpdate(room: Room?) {
         if (room == null) return
+
+        progressValidDistancePercent = room.progressValidDistancePercent
 
         val self = room.players[uid]
         if (self != null && !hasSeededFromRoom) {
@@ -194,6 +195,7 @@ class GameViewModel(
         _uiState.update {
             it.copy(
                 targetSteps = room.targetSteps,
+                progressValidDistancePercent = room.progressValidDistancePercent,
                 players = players,
                 roomStatus = room.status,
                 winnerUsername = winnerUsername

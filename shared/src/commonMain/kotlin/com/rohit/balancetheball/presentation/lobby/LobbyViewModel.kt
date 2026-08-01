@@ -25,10 +25,10 @@ class LobbyViewModel(
 
     private var observeJob: Job? = null
 
-    fun onCreateRoom(maxPlayers: Int, targetSteps: Int) {
+    fun onCreateRoom(maxPlayers: Int, targetSteps: Int, progressValidDistancePercent: Int) {
         viewModelScope.launch {
             _uiState.value = LobbyUiState.Loading
-            createRoomUseCase(uid, username, maxPlayers, targetSteps)
+            createRoomUseCase(uid, username, maxPlayers, targetSteps, progressValidDistancePercent)
                 .onSuccess { code -> observeRoom(code) }
                 .onFailure { error ->
                     _uiState.value = LobbyUiState.Error(error.message ?: "Could not create room")

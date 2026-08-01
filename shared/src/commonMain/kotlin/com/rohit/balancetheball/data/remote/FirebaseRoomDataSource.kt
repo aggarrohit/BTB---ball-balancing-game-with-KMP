@@ -21,7 +21,7 @@ private const val MAX_CREATE_ATTEMPTS = 5
  * Database schema:
  *   /rooms
  *     /{code}
- *       code, hostUid, maxPlayers, targetSteps, status, winnerUid?, createdAt
+ *       code, hostUid, maxPlayers, targetSteps, progressValidDistancePercent, status, winnerUid?, createdAt
  *       players/{uid}: username, validSteps, isEliminated, joinedAt
  *
  * `createRoom` and `claimVictory`/`playAgain` write via a single root-level updateChildren call
@@ -41,7 +41,13 @@ class FirebaseRoomDataSource {
     private fun playerRef(code: String, uid: String) = roomRef(code).child("players").child(uid)
 
     /** Generates and claims a free 4-digit code, retrying on collision. Returns the claimed code. */
-    suspend fun createRoom(hostUid: String, hostUsername: String, maxPlayers: Int, targetSteps: Int): String {
+    suspend fun createRoom(
+        hostUid: String,
+        hostUsername: String,
+        maxPlayers: Int,
+        targetSteps: Int,
+        progressValidDistancePercent: Int
+    ): String {
         var lastError: Throwable? = null
         repeat(MAX_CREATE_ATTEMPTS) {
             val code = randomCode()
@@ -54,6 +60,7 @@ class FirebaseRoomDataSource {
                             "hostUid" to hostUid,
                             "maxPlayers" to maxPlayers,
                             "targetSteps" to targetSteps,
+                            "progressValidDistancePercent" to progressValidDistancePercent,
                             "status" to RoomStatus.WAITING.toWireValue(),
                             "createdAt" to now,
                             "players" to mapOf(
@@ -166,6 +173,8 @@ class FirebaseRoomDataSource {
             hostUid = map["hostUid"] as? String ?: return null,
             maxPlayers = (map["maxPlayers"] as? Long)?.toInt() ?: return null,
             targetSteps = (map["targetSteps"] as? Long)?.toInt() ?: return null,
+            progressValidDistancePercent = (map["progressValidDistancePercent"] as? Long)?.toInt()
+                ?: Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT,
             status = RoomStatus.fromWireValue(map["status"] as? String),
             winnerUid = map["winnerUid"] as? String,
             createdAt = map["createdAt"] as? Long ?: 0L,

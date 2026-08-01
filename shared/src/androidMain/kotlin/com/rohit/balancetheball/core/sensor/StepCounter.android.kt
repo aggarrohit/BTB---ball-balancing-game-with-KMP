@@ -14,7 +14,10 @@ actual class StepCounter {
         AndroidSensorContext.appContext
             .getSystemService(android.content.Context.SENSOR_SERVICE) as SensorManager
     }
-    private val sensor: Sensor? by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) }
+
+    // TYPE_STEP_DETECTOR fires one low-latency event per step, unlike TYPE_STEP_COUNTER, which
+    // many OEMs batch (delivering several steps at once, sometimes seconds late) to save power.
+    private val sensor: Sensor? by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) }
 
     actual fun isAvailable(): Boolean = sensor != null
 
@@ -25,19 +28,19 @@ actual class StepCounter {
             return@callbackFlow
         }
 
-        var baseline: Float? = null
+        var stepCount = 0
 
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                val cumulativeSinceBoot = event.values[0]
-                val base = baseline ?: cumulativeSinceBoot.also { baseline = it }
-                trySend((cumulativeSinceBoot - base).toInt())
+                // Each event is a single detected step (event.values[0] is always 1.0).
+                stepCount++
+                trySend(stepCount)
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
 
-        sensorManager.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        sensorManager.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_FASTEST)
 
         awaitClose { sensorManager.unregisterListener(listener) }
     }.conflate()

@@ -19,7 +19,8 @@ class JoinRoomUseCaseTest {
             hostUid: String,
             hostUsername: String,
             maxPlayers: Int,
-            targetSteps: Int
+            targetSteps: Int,
+            progressValidDistancePercent: Int
         ): Result<String> = Result.success("1234")
 
         override suspend fun joinRoom(code: String, uid: String, username: String): Result<Unit> = when {
@@ -38,6 +39,8 @@ class JoinRoomUseCaseTest {
         override suspend fun tryStartIfFull(code: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun claimVictory(code: String, uid: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun endWithoutWinner(code: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun playAgain(code: String): Result<Unit> = Result.success(Unit)
 

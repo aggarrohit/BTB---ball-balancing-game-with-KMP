@@ -16,7 +16,8 @@ class CreateRoomUseCaseTest {
             hostUid: String,
             hostUsername: String,
             maxPlayers: Int,
-            targetSteps: Int
+            targetSteps: Int,
+            progressValidDistancePercent: Int
         ): Result<String> =
             if (shouldFail) Result.failure(RuntimeException("Network error")) else Result.success("1234")
 
@@ -33,6 +34,8 @@ class CreateRoomUseCaseTest {
         override suspend fun tryStartIfFull(code: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun claimVictory(code: String, uid: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun endWithoutWinner(code: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun playAgain(code: String): Result<Unit> = Result.success(Unit)
 
@@ -65,6 +68,21 @@ class CreateRoomUseCaseTest {
     fun `createRoom fails when targetSteps is not positive`() = runTest {
         val useCase = CreateRoomUseCase(FakeRoomRepository())
         val result = useCase("uid-1", "Host", maxPlayers = 4, targetSteps = 0)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `createRoom defaults balance threshold to 15 percent`() = runTest {
+        val useCase = CreateRoomUseCase(FakeRoomRepository())
+        val result = useCase("uid-1", "Host", maxPlayers = 4, targetSteps = 50)
+        assertTrue(result.isSuccess)
+        assertEquals(15, Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT)
+    }
+
+    @Test
+    fun `createRoom fails when balance threshold is out of range`() = runTest {
+        val useCase = CreateRoomUseCase(FakeRoomRepository())
+        val result = useCase("uid-1", "Host", maxPlayers = 4, targetSteps = 50, progressValidDistancePercent = 0)
         assertTrue(result.isFailure)
     }
 

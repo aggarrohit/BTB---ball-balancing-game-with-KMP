@@ -1,5 +1,6 @@
 package com.rohit.balancetheball.presentation.game
 
+import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomStatus
 
 data class PlayerProgress(
@@ -21,6 +22,7 @@ data class GameUiState(
     val stepsUnavailableReason: String? = null,
     val validSteps: Int = 0,
     val targetSteps: Int = 0,
+    val progressValidDistancePercent: Int = Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT,
     val isEliminated: Boolean = false,
     val players: List<PlayerProgress> = emptyList(),
     val roomStatus: RoomStatus = RoomStatus.IN_PROGRESS,

@@ -5,7 +5,13 @@ import kotlinx.coroutines.flow.Flow
 
 interface RoomRepository {
     /** Generates and claims a fresh 4-digit room code, retrying on collision. */
-    suspend fun createRoom(hostUid: String, hostUsername: String, maxPlayers: Int, targetSteps: Int): Result<String>
+    suspend fun createRoom(
+        hostUid: String,
+        hostUsername: String,
+        maxPlayers: Int,
+        targetSteps: Int,
+        progressValidDistancePercent: Int = Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
+    ): Result<String>
 
     /** Joins an existing, non-full, still-waiting room. */
     suspend fun joinRoom(code: String, uid: String, username: String): Result<Unit>

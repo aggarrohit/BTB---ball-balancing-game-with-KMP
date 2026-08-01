@@ -31,8 +31,16 @@ data class Room(
     val hostUid: String,
     val maxPlayers: Int,
     val targetSteps: Int,
+    /** Steps only count toward progress while the ball's distance from the table's center stays under this percent of the table's half-extents. */
+    val progressValidDistancePercent: Int = DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT,
     val status: RoomStatus,
     val winnerUid: String? = null,
     val createdAt: Long = 0L,
     val players: Map<String, RoomPlayer> = emptyMap()
-)
+) {
+    companion object {
+        const val DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT = 15
+        const val MIN_PROGRESS_VALID_DISTANCE_PERCENT = 1
+        const val MAX_PROGRESS_VALID_DISTANCE_PERCENT = 100
+    }
+}
