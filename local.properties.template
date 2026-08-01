@@ -13,3 +13,8 @@ FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.firebaseio.com
 # Firebase Project ID
 # Found in: Firebase Console → Project Settings → General
 FIREBASE_PROJECT_ID=your-project-id
+
+# Web OAuth client ID for Google Sign-In
+# Found in: Firebase Console → Authentication → Sign-in method → Google →
+# "Web client (auto created by Google Service)" (after enabling the Google provider)
+GOOGLE_WEB_CLIENT_ID=your-client-id.apps.googleusercontent.com
