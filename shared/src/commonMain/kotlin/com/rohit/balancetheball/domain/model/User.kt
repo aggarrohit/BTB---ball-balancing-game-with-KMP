@@ -6,5 +6,6 @@ package com.rohit.balancetheball.domain.model
  */
 data class User(
     val username: String,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val lastLoginAt: Long = 0L
 )

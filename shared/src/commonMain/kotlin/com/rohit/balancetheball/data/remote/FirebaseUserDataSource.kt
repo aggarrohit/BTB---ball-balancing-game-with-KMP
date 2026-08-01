@@ -14,6 +14,7 @@ import com.rohit.balancetheball.domain.model.User
  *     /{username}
  *       username: String
  *       createdAt: Long (Unix timestamp ms)
+ *       lastLoginAt: Long (Unix timestamp ms)
  */
 class FirebaseUserDataSource {
 
@@ -35,7 +36,8 @@ class FirebaseUserDataSource {
         val map = snapshot.value as? Map<String, Any> ?: return null
         return User(
             username = map["username"] as? String ?: username,
-            createdAt = map["createdAt"] as? Long ?: 0L
+            createdAt = map["createdAt"] as? Long ?: 0L,
+            lastLoginAt = map["lastLoginAt"] as? Long ?: 0L
         )
     }
 
@@ -47,8 +49,14 @@ class FirebaseUserDataSource {
         userRef(user.username).setValue(
             mapOf(
                 "username" to user.username,
-                "createdAt" to user.createdAt
+                "createdAt" to user.createdAt,
+                "lastLoginAt" to user.lastLoginAt
             )
         )
+    }
+
+    /** Updates only the lastLoginAt field of an existing user record. */
+    suspend fun updateLastLogin(username: String, timestamp: Long) {
+        userRef(username).child("lastLoginAt").setValue(timestamp)
     }
 }

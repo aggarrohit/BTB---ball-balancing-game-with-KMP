@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.rohit.balancetheball.core.config.AppConfig
+import com.rohit.balancetheball.core.sensor.AndroidSensorContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,6 +19,7 @@ class MainActivity : ComponentActivity() {
             databaseUrl = BuildConfig.FIREBASE_DATABASE_URL,
             projectId = BuildConfig.FIREBASE_PROJECT_ID
         )
+        AndroidSensorContext.init(applicationContext)
 
         setContent {
             App()

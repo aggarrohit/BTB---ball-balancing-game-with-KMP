@@ -43,6 +43,8 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.core.ktx)
             // Firebase BOM provides version constraints for all Firebase Android artifacts
             implementation(project.dependencies.platform(libs.firebase.bom))
         }

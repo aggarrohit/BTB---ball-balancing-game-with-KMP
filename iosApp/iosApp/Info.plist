@@ -8,5 +8,7 @@
 	<string>https://balance-the-ball-2f0a8-default-rtdb.europe-west1.firebasedatabase.app/</string>
 	<key>FIREBASE_PROJECT_ID</key>
 	<string>balance-the-ball-2f0a8</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Balance The Ball uses motion sensors to move the ball and count your steps.</string>
 </dict>
 </plist>

@@ -11,13 +11,15 @@ class UserRepositoryImpl(
 
     override suspend fun createAccount(username: String): Result<User> = runCatching {
         val existing = dataSource.getUser(username)
-        if (existing != null) {
-            throw IllegalStateException("Username '$username' is already taken")
-        }
         val now = currentTimeMillis()
-        val user = User(username = username, createdAt = now)
-        dataSource.createUser(user)
-        user
+        if (existing != null) {
+            dataSource.updateLastLogin(username, now)
+            existing.copy(lastLoginAt = now)
+        } else {
+            val user = User(username = username, createdAt = now, lastLoginAt = now)
+            dataSource.createUser(user)
+            user
+        }
     }
 
     override suspend fun getUser(username: String): Result<User?> = runCatching {
