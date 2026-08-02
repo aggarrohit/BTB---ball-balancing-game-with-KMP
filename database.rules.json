@@ -68,6 +68,14 @@
           ".write": "auth != null && auth.uid === $uid"
         }
       }
+    },
+    "invites": {
+      "$toUid": {
+        ".read": "auth != null && auth.uid === $toUid",
+        "$inviteId": {
+          ".write": "auth != null && ((!data.exists() && newData.child('fromUid').val() === auth.uid && newData.child('status').val() === 'pending') || (data.exists() && auth.uid === $toUid && data.child('status').val() === 'pending'))"
+        }
+      }
     }
   }
 }

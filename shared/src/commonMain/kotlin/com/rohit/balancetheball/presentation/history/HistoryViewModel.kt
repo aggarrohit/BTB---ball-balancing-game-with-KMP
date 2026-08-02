@@ -4,19 +4,35 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rohit.balancetheball.domain.model.GameHistoryEntry
 import com.rohit.balancetheball.domain.model.OpponentSummary
+import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.repository.HistoryCursor
 import com.rohit.balancetheball.domain.repository.HistoryRepository
+import com.rohit.balancetheball.domain.repository.InviteRepository
+import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val PAGE_SIZE = 20
+private const val INVITE_DEFAULT_TARGET_STEPS = 50
+
+/** One-shot events HistoryScreen should react to exactly once (not sticky state). */
+sealed interface HistoryEvent {
+    data class RoomCreatedForInvite(val roomCode: String) : HistoryEvent
+    data class InviteFailed(val message: String) : HistoryEvent
+}
 
 class HistoryViewModel(
     private val uid: String,
-    private val historyRepository: HistoryRepository
+    private val username: String,
+    private val historyRepository: HistoryRepository,
+    private val createRoomUseCase: CreateRoomUseCase,
+    private val inviteRepository: InviteRepository
 ) : ViewModel() {
 
     private val _gameHistoryState = MutableStateFlow(PagedListUiState<GameHistoryEntry>())
@@ -27,9 +43,33 @@ class HistoryViewModel(
     val opponentsState: StateFlow<PagedListUiState<OpponentSummary>> = _opponentsState.asStateFlow()
     private var opponentsCursor: HistoryCursor? = null
 
+    private val _events = MutableSharedFlow<HistoryEvent>(extraBufferCapacity = 4)
+    val events: SharedFlow<HistoryEvent> = _events.asSharedFlow()
+
     init {
         loadMoreGameHistory()
         loadMoreOpponents()
+    }
+
+    /** Creates a fresh 2-player room and invites [opponent] to it (see InviteRepository/functions/index.js for delivery). */
+    fun onInviteOpponent(opponent: OpponentSummary) {
+        viewModelScope.launch {
+            createRoomUseCase(
+                hostUid = uid,
+                hostUsername = username,
+                maxPlayers = 2,
+                targetSteps = INVITE_DEFAULT_TARGET_STEPS,
+                progressValidDistancePercent = Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
+            ).onSuccess { roomCode ->
+                inviteRepository.sendInvite(uid, username, opponent.uid, roomCode)
+                    .onSuccess { _events.emit(HistoryEvent.RoomCreatedForInvite(roomCode)) }
+                    .onFailure { error ->
+                        _events.emit(HistoryEvent.InviteFailed(error.message ?: "Could not send invite"))
+                    }
+            }.onFailure { error ->
+                _events.emit(HistoryEvent.InviteFailed(error.message ?: "Could not create room"))
+            }
+        }
     }
 
     fun loadMoreGameHistory() {

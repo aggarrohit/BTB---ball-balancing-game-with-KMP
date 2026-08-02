@@ -22,7 +22,13 @@ dependencies {
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.androidx.core.ktx)
     debugImplementation(libs.compose.uiTooling)
+
+    // Firebase Cloud Messaging — needs a real FirebaseMessagingService for background/tap
+    // handling, so it's wired natively here rather than through the shared KMP Firebase SDK.
+    implementation(platform(libs.firebase.bom))
+    implementation("com.google.firebase:firebase-messaging")
 }
 
 android {

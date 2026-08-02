@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2EF461ED301D284C004CC938 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2EF461EC301D284C004CC938 /* FirebaseDatabase */; };
+		44D4F44117A04C31A2D87096 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = D1AEC6C44BCF436F8B6484D5 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2EF461ED301D284C004CC938 /* FirebaseDatabase in Frameworks */,
+				44D4F44117A04C31A2D87096 /* FirebaseMessaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +93,7 @@
 			name = iosApp;
 			packageProductDependencies = (
 				2EF461EC301D284C004CC938 /* FirebaseDatabase */,
+				D1AEC6C44BCF436F8B6484D5 /* FirebaseMessaging */,
 			);
 			productName = iosApp;
 			productReference = 66EF6CA4D20A50447F23F156 /* BTB.app */;
@@ -398,6 +401,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2EF461EB301D284C004CC938 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseDatabase;
+		};
+		D1AEC6C44BCF436F8B6484D5 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2EF461EB301D284C004CC938 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -17,13 +17,22 @@ class LobbyViewModel(
     private val joinRoomUseCase: JoinRoomUseCase,
     private val roomRepository: RoomRepository,
     private val uid: String,
-    private val username: String
+    private val username: String,
+    /** Set when arriving having already created a room elsewhere (e.g. inviting an opponent from
+     * History) — jumps straight into the waiting-room UI instead of starting at Idle. */
+    initialRoomCode: String? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LobbyUiState>(LobbyUiState.Idle)
     val uiState: StateFlow<LobbyUiState> = _uiState.asStateFlow()
 
     private var observeJob: Job? = null
+
+    init {
+        if (initialRoomCode != null) {
+            observeRoom(initialRoomCode)
+        }
+    }
 
     fun onCreateRoom(maxPlayers: Int, targetSteps: Int, progressValidDistancePercent: Int) {
         viewModelScope.launch {

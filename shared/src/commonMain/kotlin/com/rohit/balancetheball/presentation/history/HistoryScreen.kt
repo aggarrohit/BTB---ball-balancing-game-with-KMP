@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,11 +39,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.data.remote.FirebaseHistoryDataSource
+import com.rohit.balancetheball.data.remote.FirebaseInviteDataSource
+import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
 import com.rohit.balancetheball.data.repository.HistoryRepositoryImpl
+import com.rohit.balancetheball.data.repository.InviteRepositoryImpl
+import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.GameHistoryEntry
 import com.rohit.balancetheball.domain.model.GameResult
 import com.rohit.balancetheball.domain.model.OpponentSummary
 import com.rohit.balancetheball.domain.model.User
+import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.AppBackground
@@ -57,53 +64,80 @@ private enum class HistoryTab { GAMES, OPPONENTS }
 fun HistoryScreen(
     user: User,
     onBack: () -> Unit,
+    onInviteSent: (roomCode: String) -> Unit,
     navKey: Long = 0L,
     viewModel: HistoryViewModel = viewModel(key = navKey.toString()) {
         // Manual dependency wiring — swap in a DI framework when needed
-        HistoryViewModel(uid = user.uid, historyRepository = HistoryRepositoryImpl(FirebaseHistoryDataSource()))
+        HistoryViewModel(
+            uid = user.uid,
+            username = user.username,
+            historyRepository = HistoryRepositoryImpl(FirebaseHistoryDataSource()),
+            createRoomUseCase = CreateRoomUseCase(RoomRepositoryImpl(FirebaseRoomDataSource())),
+            inviteRepository = InviteRepositoryImpl(FirebaseInviteDataSource())
+        )
     }
 ) {
     var tab by remember { mutableStateOf(HistoryTab.GAMES) }
     val gameHistoryState by viewModel.gameHistoryState.collectAsStateWithLifecycle()
     val opponentsState by viewModel.opponentsState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler(enabled = true) { onBack() }
 
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is HistoryEvent.RoomCreatedForInvite -> onInviteSent(event.roomCode)
+                is HistoryEvent.InviteFailed -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+
     AppBackground {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AnimatedOutlinedButton(onClick = onBack) { Text("Back") }
-                Text("History", style = MaterialTheme.typography.headlineSmall)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AnimatedOutlinedButton(onClick = onBack) { Text("Back") }
+                    Text("History", style = MaterialTheme.typography.headlineSmall)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HistoryTabButton("Games", selected = tab == HistoryTab.GAMES) { tab = HistoryTab.GAMES }
+                    HistoryTabButton("Opponents", selected = tab == HistoryTab.OPPONENTS) { tab = HistoryTab.OPPONENTS }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when (tab) {
+                    HistoryTab.GAMES -> PagedList(
+                        state = gameHistoryState,
+                        onLoadMore = viewModel::loadMoreGameHistory,
+                        emptyMessage = "No games played yet",
+                        itemKey = { it.roundId }
+                    ) { entry -> GameHistoryRow(entry, modifier = Modifier.fillMaxWidth()) }
+                    HistoryTab.OPPONENTS -> PagedList(
+                        state = opponentsState,
+                        onLoadMore = viewModel::loadMoreOpponents,
+                        emptyMessage = "No opponents yet",
+                        itemKey = { it.uid }
+                    ) { opponent ->
+                        OpponentRow(
+                            opponent = opponent,
+                            onInvite = { viewModel.onInviteOpponent(opponent) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HistoryTabButton("Games", selected = tab == HistoryTab.GAMES) { tab = HistoryTab.GAMES }
-                HistoryTabButton("Opponents", selected = tab == HistoryTab.OPPONENTS) { tab = HistoryTab.OPPONENTS }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            when (tab) {
-                HistoryTab.GAMES -> PagedList(
-                    state = gameHistoryState,
-                    onLoadMore = viewModel::loadMoreGameHistory,
-                    emptyMessage = "No games played yet",
-                    itemKey = { it.roundId }
-                ) { entry -> GameHistoryRow(entry, modifier = Modifier.fillMaxWidth()) }
-                HistoryTab.OPPONENTS -> PagedList(
-                    state = opponentsState,
-                    onLoadMore = viewModel::loadMoreOpponents,
-                    emptyMessage = "No opponents yet",
-                    itemKey = { it.uid }
-                ) { opponent -> OpponentRow(opponent, modifier = Modifier.fillMaxWidth()) }
-            }
+            SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
 }
@@ -218,7 +252,7 @@ private fun ResultBadge(result: GameResult) {
 }
 
 @Composable
-private fun OpponentRow(opponent: OpponentSummary, modifier: Modifier = Modifier) {
+private fun OpponentRow(opponent: OpponentSummary, onInvite: () -> Unit, modifier: Modifier = Modifier) {
     GlassCard(modifier = modifier, contentPadding = 16.dp) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -228,12 +262,12 @@ private fun OpponentRow(opponent: OpponentSummary, modifier: Modifier = Modifier
             Column {
                 Text(opponent.username, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "Last played ${formatDate(opponent.lastPlayedAt)}",
+                    text = "Last played ${formatDate(opponent.lastPlayedAt)} · ${opponent.gamesPlayedTogether} games",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text("${opponent.gamesPlayedTogether} games", style = MaterialTheme.typography.bodyMedium)
+            AnimatedOutlinedButton(onClick = onInvite) { Text("Invite") }
         }
     }
 }

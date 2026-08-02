@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.rohit.balancetheball.core.push.PendingInvite
+import com.rohit.balancetheball.core.push.PendingInviteHolder
 import com.rohit.balancetheball.core.theme.AppTheme
 import com.rohit.balancetheball.core.theme.ThemePreferences
 import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
@@ -25,9 +27,11 @@ import com.rohit.balancetheball.presentation.auth.SignInScreen
 import com.rohit.balancetheball.presentation.common.ThemeMenu
 import com.rohit.balancetheball.presentation.game.GameScreen
 import com.rohit.balancetheball.presentation.history.HistoryScreen
+import com.rohit.balancetheball.presentation.invite.InviteResponseScreen
 import com.rohit.balancetheball.presentation.lobby.LobbyScreen
 import com.rohit.balancetheball.presentation.username.UsernameScreen
 import com.rohit.balancetheball.core.util.currentTimeMillis
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -41,9 +45,22 @@ private sealed interface AppRoute {
     data object Loading : AppRoute
     data class SignedOut(val navKey: Long = currentTimeMillis()) : AppRoute
     data class NeedsUsername(val authUser: AuthUser) : AppRoute
-    data class InLobby(val user: User, val navKey: Long = currentTimeMillis()) : AppRoute
+    data class InLobby(
+        val user: User,
+        val navKey: Long = currentTimeMillis(),
+        val pendingRoomCode: String? = null
+    ) : AppRoute
     data class InRoom(val user: User, val roomCode: String) : AppRoute
     data class InHistory(val user: User, val navKey: Long = currentTimeMillis()) : AppRoute
+    data class InviteResponse(val user: User, val invite: PendingInvite) : AppRoute
+}
+
+private fun currentUserOrNull(route: AppRoute): User? = when (route) {
+    is AppRoute.InLobby -> route.user
+    is AppRoute.InRoom -> route.user
+    is AppRoute.InHistory -> route.user
+    is AppRoute.InviteResponse -> route.user
+    else -> null
 }
 
 @Composable
@@ -69,6 +86,19 @@ fun App(
             if (current == null) route = AppRoute.SignedOut() else resolveRoute(current)
         }
 
+        // Handles both a cold start (app launched by tapping an invite notification, waiting for
+        // sign-in to resolve) and a warm one (invite arrives while already signed in) — reacts to
+        // either the invite or the route changing, and only consumes it once a user is available.
+        LaunchedEffect(Unit) {
+            combine(snapshotFlow { route }, PendingInviteHolder.pending) { currentRoute, invite -> currentRoute to invite }
+                .collect { (currentRoute, invite) ->
+                    if (invite == null || currentRoute is AppRoute.InviteResponse) return@collect
+                    val user = currentUserOrNull(currentRoute) ?: return@collect
+                    PendingInviteHolder.pending.value = null
+                    route = AppRoute.InviteResponse(user, invite)
+                }
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
             when (val currentRoute = route) {
                 is AppRoute.Loading -> {
@@ -92,6 +122,7 @@ fun App(
                     LobbyScreen(
                         user = currentRoute.user,
                         navKey = currentRoute.navKey,
+                        initialRoomCode = currentRoute.pendingRoomCode,
                         onRoomStarted = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) },
                         onLoggedOut = { route = AppRoute.SignedOut() },
                         onHistoryClick = { route = AppRoute.InHistory(currentRoute.user) }
@@ -109,7 +140,18 @@ fun App(
                     HistoryScreen(
                         user = currentRoute.user,
                         navKey = currentRoute.navKey,
-                        onBack = { route = AppRoute.InLobby(currentRoute.user) }
+                        onBack = { route = AppRoute.InLobby(currentRoute.user) },
+                        onInviteSent = { roomCode ->
+                            route = AppRoute.InLobby(currentRoute.user, pendingRoomCode = roomCode)
+                        }
+                    )
+                }
+                is AppRoute.InviteResponse -> {
+                    InviteResponseScreen(
+                        user = currentRoute.user,
+                        invite = currentRoute.invite,
+                        onJoined = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) },
+                        onDismiss = { route = AppRoute.InLobby(currentRoute.user) }
                     )
                 }
             }

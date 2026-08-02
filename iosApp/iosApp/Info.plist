@@ -11,6 +11,16 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Balance The Ball uses motion sensors to move the ball and count your steps.</string>
 	<!--
+	  Lets the app process a remote (push) notification's data payload while backgrounded, not
+	  just when foregrounded. The other half of push support — the "Push Notifications" capability
+	  itself (entitlements + provisioning profile) — has to be added in Xcode's Signing &
+	  Capabilities tab, since that also touches the App ID on Apple's servers.
+	-->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<!--
 	  Google Sign-In redirect URL scheme. Once Google Sign-In is enabled in the Firebase Console
 	  and GoogleService-Info.plist is re-downloaded, copy its REVERSED_CLIENT_ID value in below
 	  (replacing the placeholder) — without this, the OAuth redirect back into the app will hang.

@@ -24,6 +24,7 @@ import com.rohit.balancetheball.domain.repository.AuthRepository
 import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
 import com.rohit.balancetheball.domain.usecase.JoinRoomUseCase
 import com.rohit.balancetheball.domain.model.Room.Companion.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
+import com.rohit.balancetheball.core.push.RequestNotificationPermission
 import com.rohit.balancetheball.core.util.exitApp
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
@@ -41,6 +42,7 @@ fun LobbyScreen(
     onLoggedOut: () -> Unit,
     onHistoryClick: () -> Unit,
     navKey: Long = 0L,
+    initialRoomCode: String? = null,
     authRepository: AuthRepository = remember { FirebaseAuthRepository() },
     viewModel: LobbyViewModel = viewModel(key = navKey.toString()) {
         // Manual dependency wiring — swap in a DI framework when needed
@@ -50,7 +52,8 @@ fun LobbyScreen(
             joinRoomUseCase = JoinRoomUseCase(roomRepository),
             roomRepository = roomRepository,
             uid = user.uid,
-            username = user.username
+            username = user.username,
+            initialRoomCode = initialRoomCode
         )
     }
 ) {
@@ -58,6 +61,10 @@ fun LobbyScreen(
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showExitAppConfirm by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    // Needed to actually receive invite notifications — a denial just means invites won't show
+    // up as system notifications, not a blocking error.
+    RequestNotificationPermission { }
 
     // This is the app's "root" screen after signing in — there's nowhere to navigate back to, so
     // the system back button (Android) should ask before quitting rather than silently exiting.
