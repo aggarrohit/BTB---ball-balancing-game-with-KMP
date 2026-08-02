@@ -19,6 +19,8 @@ import com.rohit.balancetheball.domain.model.AuthUser
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.usecase.ClaimUsernameUseCase
 import com.rohit.balancetheball.presentation.common.AnimatedButton
+import com.rohit.balancetheball.presentation.common.AppBackground
+import com.rohit.balancetheball.presentation.common.GlassCard
 
 private fun suggestUsername(displayName: String?): String =
     displayName.orEmpty().filter { it.isLetterOrDigit() || it == '_' }.take(20)
@@ -62,62 +64,66 @@ private fun UsernameContent(
     var username by remember { mutableStateOf(initialUsername) }
     val keyboard = LocalSoftwareKeyboardController.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+    AppBackground {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 48.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Pick a username",
-                style = MaterialTheme.typography.headlineLarge,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "This is how other players will see you",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                placeholder = { Text("e.g. BallMaster99") },
-                singleLine = true,
-                enabled = uiState !is UsernameUiState.Loading,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    keyboard?.hide()
-                    onClaimUsername(username)
-                }),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            AnimatedButton(
-                onClick = {
-                    keyboard?.hide()
-                    onClaimUsername(username)
-                },
-                enabled = username.isNotBlank() && uiState !is UsernameUiState.Loading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                if (uiState is UsernameUiState.Loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
+            GlassCard {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    Text(
+                        text = "Pick a username",
+                        style = MaterialTheme.typography.headlineLarge,
+                        textAlign = TextAlign.Center
                     )
-                } else {
-                    Text("Continue")
+
+                    Text(
+                        text = "This is how other players will see you",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Username") },
+                        placeholder = { Text("e.g. BallMaster99") },
+                        singleLine = true,
+                        enabled = uiState !is UsernameUiState.Loading,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            keyboard?.hide()
+                            onClaimUsername(username)
+                        }),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    AnimatedButton(
+                        onClick = {
+                            keyboard?.hide()
+                            onClaimUsername(username)
+                        },
+                        enabled = username.isNotBlank() && uiState !is UsernameUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        if (uiState is UsernameUiState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Continue")
+                        }
+                    }
                 }
             }
         }

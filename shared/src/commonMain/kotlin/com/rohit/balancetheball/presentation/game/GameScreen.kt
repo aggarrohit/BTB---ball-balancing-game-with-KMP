@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -61,6 +63,7 @@ import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.repository.AuthRepository
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
+import com.rohit.balancetheball.presentation.common.GlassCard
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -143,7 +146,9 @@ fun GameScreen(
                 .fillMaxWidth(TABLE_WIDTH_FRACTION)
                 .fillMaxHeight(TABLE_HEIGHT_FRACTION)
                 .align(Alignment.Center)
+                .shadow(elevation = 12.dp, shape = RoundedCornerShape(24.dp), clip = false)
                 .background(Color(0xFF2E7D32), RoundedCornerShape(24.dp))
+                .border(2.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(24.dp))
                 .onSizeChanged { size ->
                     viewModel.onTableSizeChanged(size.width.toFloat(), size.height.toFloat())
                 }
@@ -204,35 +209,38 @@ fun GameScreen(
             }
         }
 
-        Column(
+        GlassCard(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            shape = RoundedCornerShape(20.dp),
+            contentPadding = 16.dp
         ) {
-            Text(
-                text = uiState.stepsUnavailableReason?.let { "Steps: unavailable ($it)" }
-                    ?: "Steps: ${uiState.stepCount}",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "Distance: ${(uiState.distanceFraction * 100).roundToInt()}% " +
-                    "(threshold ${uiState.progressValidDistancePercent}%)" +
-                    if (uiState.isEliminated) " — off the table" else "",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = "Progress: ${uiState.validSteps} / ${uiState.targetSteps}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            if (uiState.players.isNotEmpty()) {
-                PlayerGrid(
-                    players = uiState.players,
-                    targetSteps = uiState.targetSteps,
-                    modifier = Modifier.padding(top = 8.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = uiState.stepsUnavailableReason?.let { "Steps: unavailable ($it)" }
+                        ?: "Steps: ${uiState.stepCount}",
+                    style = MaterialTheme.typography.titleMedium
                 )
+                Text(
+                    text = "Distance: ${(uiState.distanceFraction * 100).roundToInt()}% " +
+                        "(threshold ${uiState.progressValidDistancePercent}%)" +
+                        if (uiState.isEliminated) " — off the table" else "",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Progress: ${uiState.validSteps} / ${uiState.targetSteps}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                if (uiState.players.isNotEmpty()) {
+                    PlayerGrid(
+                        players = uiState.players,
+                        targetSteps = uiState.targetSteps,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
 
@@ -374,7 +382,7 @@ private fun PlayerCard(player: PlayerProgress, targetSteps: Int, modifier: Modif
     } else 0
     Row(
         modifier = modifier
-            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {

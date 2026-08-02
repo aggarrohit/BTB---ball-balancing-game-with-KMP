@@ -25,7 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
 import com.rohit.balancetheball.domain.model.AuthUser
 import com.rohit.balancetheball.presentation.common.AnimatedButton
+import com.rohit.balancetheball.presentation.common.AppBackground
 import com.rohit.balancetheball.presentation.common.BallLogoImage
+import com.rohit.balancetheball.presentation.common.GlassCard
 
 @Composable
 fun SignInScreen(
@@ -48,46 +50,50 @@ fun SignInScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+    AppBackground {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 48.dp),
+            contentAlignment = Alignment.Center
         ) {
-            BallLogoImage(modifier = Modifier.size(96.dp))
+            GlassCard {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    BallLogoImage(modifier = Modifier.size(96.dp))
 
-            Text(
-                text = "Balance The Ball",
-                style = MaterialTheme.typography.headlineLarge,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Sign in to play",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            AnimatedButton(
-                onClick = launchGoogleSignIn,
-                enabled = uiState !is AuthUiState.Loading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                if (uiState is AuthUiState.Loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
+                    Text(
+                        text = "Balance The Ball",
+                        style = MaterialTheme.typography.headlineLarge,
+                        textAlign = TextAlign.Center
                     )
-                } else {
-                    Text("Sign in with Google")
+
+                    Text(
+                        text = "Sign in to play",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    AnimatedButton(
+                        onClick = launchGoogleSignIn,
+                        enabled = uiState !is AuthUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        if (uiState is AuthUiState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Sign in with Google")
+                        }
+                    }
                 }
             }
         }
