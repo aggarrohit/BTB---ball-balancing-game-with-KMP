@@ -80,7 +80,8 @@ fun App(
                 LobbyScreen(
                     user = currentRoute.user,
                     navKey = currentRoute.navKey,
-                    onRoomStarted = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) }
+                    onRoomStarted = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) },
+                    onLoggedOut = { route = AppRoute.SignedOut() }
                 )
             }
             is AppRoute.InRoom -> {

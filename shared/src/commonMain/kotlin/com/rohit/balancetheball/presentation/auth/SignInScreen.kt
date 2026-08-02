@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
 import com.rohit.balancetheball.domain.model.AuthUser
+import com.rohit.balancetheball.presentation.common.AnimatedButton
+import com.rohit.balancetheball.presentation.common.BallLogoImage
 
 @Composable
 fun SignInScreen(
@@ -57,6 +58,8 @@ fun SignInScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            BallLogoImage(modifier = Modifier.size(96.dp))
+
             Text(
                 text = "Balance The Ball",
                 style = MaterialTheme.typography.headlineLarge,
@@ -70,7 +73,7 @@ fun SignInScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Button(
+            AnimatedButton(
                 onClick = launchGoogleSignIn,
                 enabled = uiState !is AuthUiState.Loading,
                 modifier = Modifier

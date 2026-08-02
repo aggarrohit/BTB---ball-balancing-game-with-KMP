@@ -39,4 +39,13 @@ interface RoomRepository {
 
     /** Resets the caller's own progress for a new round (call after [playAgain] flips the room back to waiting). */
     suspend fun resetOwnProgress(code: String, uid: String): Result<Unit>
+
+    /** Proposes a new round; the caller is auto-recorded as having accepted. */
+    suspend fun proposePlayAgain(code: String, uid: String): Result<Unit>
+
+    /** Records the caller's acceptance of the current play-again request. */
+    suspend fun acceptPlayAgain(code: String, uid: String): Result<Unit>
+
+    /** Removes the caller from the room and records their decline for the current play-again request. */
+    suspend fun declinePlayAgain(code: String, uid: String, username: String): Result<Unit>
 }

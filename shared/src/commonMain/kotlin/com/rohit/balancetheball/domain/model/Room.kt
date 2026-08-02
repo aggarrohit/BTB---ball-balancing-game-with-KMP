@@ -26,6 +26,18 @@ data class RoomPlayer(
     val joinedAt: Long = 0L
 )
 
+/**
+ * An in-flight "play again?" proposal. [acceptedBy] always includes [requestedBy] (auto-accepted
+ * at creation). [declinedBy] maps uid -> username, since a decliner's [RoomPlayer] entry is
+ * removed in the same write, so their username wouldn't be recoverable from [Room.players] by
+ * the time other clients render it.
+ */
+data class PlayAgainRequest(
+    val requestedBy: String,
+    val acceptedBy: Set<String> = emptySet(),
+    val declinedBy: Map<String, String> = emptyMap()
+)
+
 data class Room(
     val code: String,
     val hostUid: String,
@@ -36,7 +48,8 @@ data class Room(
     val status: RoomStatus,
     val winnerUid: String? = null,
     val createdAt: Long = 0L,
-    val players: Map<String, RoomPlayer> = emptyMap()
+    val players: Map<String, RoomPlayer> = emptyMap(),
+    val playAgainRequest: PlayAgainRequest? = null
 ) {
     companion object {
         const val DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT = 15

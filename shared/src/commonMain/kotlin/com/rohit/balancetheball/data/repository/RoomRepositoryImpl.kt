@@ -64,4 +64,16 @@ class RoomRepositoryImpl(
     override suspend fun resetOwnProgress(code: String, uid: String): Result<Unit> = runCatching {
         dataSource.resetOwnProgress(code, uid)
     }
+
+    override suspend fun proposePlayAgain(code: String, uid: String): Result<Unit> = runCatching {
+        dataSource.proposePlayAgain(code, uid)
+    }
+
+    override suspend fun acceptPlayAgain(code: String, uid: String): Result<Unit> = runCatching {
+        dataSource.acceptPlayAgain(code, uid)
+    }
+
+    override suspend fun declinePlayAgain(code: String, uid: String, username: String): Result<Unit> = runCatching {
+        dataSource.declinePlayAgain(code, uid, username)
+    }
 }

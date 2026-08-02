@@ -1,5 +1,7 @@
 package com.rohit.balancetheball.presentation.game
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,28 +20,34 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.core.sensor.RequestStepPermission
@@ -51,23 +59,19 @@ import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.repository.AuthRepository
+import com.rohit.balancetheball.presentation.common.AnimatedButton
+import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val BALL_RADIUS = 24.dp
 private val CENTER_MARKER_RADIUS = 5.dp
 private val CENTER_MARKER_ARM_LENGTH = 14.dp
-private val TABLE_WIDTH_FRACTION = 0.8f
-private val TABLE_HEIGHT_FRACTION = 0.6f
+private const val TABLE_WIDTH_FRACTION = 0.8f
+private const val TABLE_HEIGHT_FRACTION = 0.54f // 10% smaller than the original 0.6f
+private const val FALL_ANIMATION_MS = 650
 
-/** kotlin.math has no cross-platform sprintf, so format one decimal place by hand. */
-private fun Float.formatOneDecimal(): String {
-    val tenths = kotlin.math.round(this * 10).toInt()
-    val sign = if (tenths < 0) "-" else ""
-    val absTenths = kotlin.math.abs(tenths)
-    return "$sign${absTenths / 10}.${absTenths % 10}"
-}
-
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun GameScreen(
     user: User,
@@ -92,8 +96,39 @@ fun GameScreen(
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showExitConfirm by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     RequestStepPermission { granted -> viewModel.onStepPermissionResult(granted) }
+
+    fun requestExitGame() {
+        viewModel.onPauseSensors()
+        showExitConfirm = true
+    }
+
+    // System back button (Android) exits the *game* (with the same confirm-and-pause behavior as
+    // the Exit Game button) rather than falling through to the default "finish the Activity"
+    // behavior, which would silently close the whole app. No-ops on iOS (no back-gesture source
+    // is registered outside a real navigation stack, which this app doesn't have).
+    BackHandler(enabled = true) { requestExitGame() }
+
+    // Sensors/physics pause while the app is backgrounded and resume when it's foregrounded again
+    // — ON_START/ON_STOP (not ON_RESUME/ON_PAUSE) are the correct pair for real backgrounding on
+    // both Android and iOS. The room observer inside GameViewModel keeps running regardless, so
+    // multiplayer state stays fresh even while paused.
+    LifecycleStartEffect(Unit) {
+        viewModel.onResumeSensors()
+        onStopOrDispose { viewModel.onPauseSensors() }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is GameEvent.PlayerDeclinedPlayAgain ->
+                    snackbarHostState.showSnackbar("${event.username} denied and left the room")
+                GameEvent.LeftRoomAfterDecline -> onExitGame()
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -130,6 +165,24 @@ fun GameScreen(
         }
 
         if (uiState.ballReady) {
+            // Once eliminated, the ball visibly shrinks/fades/drops once, then stays gone — driven
+            // purely by isEliminated, which GameViewModel also freezes the ball's position on.
+            val fallAlpha by animateFloatAsState(
+                targetValue = if (uiState.isEliminated) 0f else 1f,
+                animationSpec = tween(FALL_ANIMATION_MS),
+                label = "ballFallAlpha"
+            )
+            val fallScale by animateFloatAsState(
+                targetValue = if (uiState.isEliminated) 0.3f else 1f,
+                animationSpec = tween(FALL_ANIMATION_MS),
+                label = "ballFallScale"
+            )
+            val fallDropPx by animateFloatAsState(
+                targetValue = if (uiState.isEliminated) 80f else 0f,
+                animationSpec = tween(FALL_ANIMATION_MS),
+                label = "ballFallDrop"
+            )
+
             Box(
                 modifier = Modifier
                     .size(BALL_RADIUS * 2)
@@ -138,6 +191,12 @@ fun GameScreen(
                             (uiState.ballX - ballRadiusPx).roundToInt(),
                             (uiState.ballY - ballRadiusPx).roundToInt()
                         )
+                    }
+                    .graphicsLayer {
+                        alpha = fallAlpha
+                        scaleX = fallScale
+                        scaleY = fallScale
+                        translationY = fallDropPx
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -169,23 +228,20 @@ fun GameScreen(
             )
 
             if (uiState.players.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.padding(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    uiState.players.forEach { player ->
-                        val progressPct = if (uiState.targetSteps > 0) {
-                            (player.validSteps * 100 / uiState.targetSteps).coerceAtMost(100)
-                        } else 0
-                        Text(
-                            text = "${player.username}: $progressPct%" + if (player.isEliminated) " (out)" else "",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = if (player.isSelf) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
+                PlayerGrid(
+                    players = uiState.players,
+                    targetSteps = uiState.targetSteps,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp)
+        )
 
         Row(
             modifier = Modifier
@@ -194,8 +250,8 @@ fun GameScreen(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            OutlinedButton(onClick = { showLogoutConfirm = true }) { Text("Logout") }
-            OutlinedButton(onClick = { showExitConfirm = true }) { Text("Exit Game") }
+            AnimatedOutlinedButton(onClick = { showLogoutConfirm = true }) { Text("Logout") }
+            AnimatedOutlinedButton(onClick = { requestExitGame() }) { Text("Exit Game") }
         }
     }
 
@@ -221,7 +277,10 @@ fun GameScreen(
 
     if (showExitConfirm) {
         AlertDialog(
-            onDismissRequest = { showExitConfirm = false },
+            onDismissRequest = {
+                showExitConfirm = false
+                viewModel.onResumeSensors()
+            },
             title = { Text("Exit game?") },
             text = { Text("Sure you want to exit? You'll leave the room and head back to the Lobby.") },
             confirmButton = {
@@ -231,27 +290,105 @@ fun GameScreen(
                 }) { Text("Exit") }
             },
             dismissButton = {
-                TextButton(onClick = { showExitConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = {
+                    showExitConfirm = false
+                    viewModel.onResumeSensors()
+                }) { Text("Cancel") }
             }
         )
     }
 
     if (uiState.roomStatus == RoomStatus.FINISHED) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text("Game over") },
-            text = {
-                Text(
-                    uiState.winnerUsername?.let { "$it wins!" }
-                        ?: "Everyone fell off the table — no winner this round."
+        val request = uiState.playAgainRequest
+        when {
+            request == null -> {
+                AlertDialog(
+                    onDismissRequest = { },
+                    title = { Text("Game over") },
+                    text = {
+                        Text(
+                            uiState.winnerUsername?.let { "$it wins!" }
+                                ?: if (uiState.players.size <= 1) {
+                                    "You fell off the table — try again!"
+                                } else {
+                                    "Everyone fell off the table — no winner this round."
+                                }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.onProposePlayAgain() }) { Text("Play Again") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = onExitGame) { Text("Back to Lobby") }
+                    }
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onPlayAgain() }) { Text("Play Again") }
-            },
-            dismissButton = {
-                TextButton(onClick = onExitGame) { Text("Back to Lobby") }
             }
+            request.hasAccepted -> {
+                val stillWaitingOn = (request.totalNeeded - request.acceptedCount).coerceAtLeast(0)
+                AlertDialog(
+                    onDismissRequest = { },
+                    title = { Text("Waiting for players…") },
+                    text = { Text("Waiting on $stillWaitingOn more player(s) to accept.") },
+                    confirmButton = {
+                        TextButton(onClick = onExitGame) { Text("Back to Lobby") }
+                    }
+                )
+            }
+            else -> {
+                AlertDialog(
+                    onDismissRequest = { },
+                    title = { Text("Play again?") },
+                    text = { Text("${request.requestedByUsername} wants to play again.") },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.onAcceptPlayAgain() }) { Text("Play") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.onDeclinePlayAgain() }) { Text("Deny") }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerGrid(players: List<PlayerProgress>, targetSteps: Int, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        players.chunked(2).forEach { rowPlayers ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowPlayers.forEach { player ->
+                    PlayerCard(player, targetSteps, modifier = Modifier.weight(1f))
+                }
+                if (rowPlayers.size == 1) {
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerCard(player: PlayerProgress, targetSteps: Int, modifier: Modifier = Modifier) {
+    val progressPct = if (targetSteps > 0) {
+        (player.validSteps * 100 / targetSteps).coerceAtMost(100)
+    } else 0
+    Row(
+        modifier = modifier
+            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = player.username,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (player.isSelf) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$progressPct%" + if (player.isEliminated) " ✗" else "",
+            style = MaterialTheme.typography.bodySmall
         )
     }
 }

@@ -5,29 +5,40 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
 import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
 import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
+import com.rohit.balancetheball.domain.repository.AuthRepository
 import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
 import com.rohit.balancetheball.domain.usecase.JoinRoomUseCase
 import com.rohit.balancetheball.domain.model.Room.Companion.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
+import com.rohit.balancetheball.core.util.exitApp
+import com.rohit.balancetheball.presentation.common.AnimatedButton
+import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
+import kotlinx.coroutines.launch
 
 private enum class LobbyTab { CREATE, JOIN }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LobbyScreen(
     user: User,
     onRoomStarted: (roomCode: String) -> Unit,
+    onLoggedOut: () -> Unit,
     navKey: Long = 0L,
+    authRepository: AuthRepository = remember { FirebaseAuthRepository() },
     viewModel: LobbyViewModel = viewModel(key = navKey.toString()) {
         // Manual dependency wiring — swap in a DI framework when needed
         val roomRepository = RoomRepositoryImpl(FirebaseRoomDataSource())
@@ -41,6 +52,14 @@ fun LobbyScreen(
     }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showLogoutConfirm by remember { mutableStateOf(false) }
+    var showExitAppConfirm by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // This is the app's "root" screen after signing in — there's nowhere to navigate back to, so
+    // the system back button (Android) should ask before quitting rather than silently exiting.
+    // No-ops on iOS (no back-gesture source registered outside a real navigation stack).
+    BackHandler(enabled = true) { showExitAppConfirm = true }
 
     LaunchedEffect(uiState) {
         val state = uiState
@@ -51,13 +70,52 @@ fun LobbyScreen(
 
     val state = uiState
     if (state is LobbyUiState.WaitingInRoom) {
-        WaitingRoomContent(room = state.room, onBack = viewModel::resetState)
+        WaitingRoomContent(
+            room = state.room,
+            onBack = viewModel::resetState,
+            onLogoutClick = { showLogoutConfirm = true }
+        )
     } else {
         LobbyForm(
             uiState = state,
             onCreateRoom = viewModel::onCreateRoom,
             onJoinRoom = viewModel::onJoinRoom,
-            onDismissError = viewModel::resetState
+            onDismissError = viewModel::resetState,
+            onLogoutClick = { showLogoutConfirm = true }
+        )
+    }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text("Log out?") },
+            text = { Text("You'll need to sign in again to play.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutConfirm = false
+                    coroutineScope.launch {
+                        authRepository.signOut()
+                        onLoggedOut()
+                    }
+                }) { Text("Log out") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showExitAppConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitAppConfirm = false },
+            title = { Text("Exit app?") },
+            text = { Text("Are you sure you want to close Balance The Ball?") },
+            confirmButton = {
+                TextButton(onClick = { exitApp() }) { Text("Exit") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitAppConfirm = false }) { Text("Cancel") }
+            }
         )
     }
 }
@@ -67,7 +125,8 @@ private fun LobbyForm(
     uiState: LobbyUiState,
     onCreateRoom: (maxPlayers: Int, targetSteps: Int, progressValidDistancePercent: Int) -> Unit,
     onJoinRoom: (code: String) -> Unit,
-    onDismissError: () -> Unit
+    onDismissError: () -> Unit,
+    onLogoutClick: () -> Unit
 ) {
     var tab by remember { mutableStateOf(LobbyTab.CREATE) }
     var maxPlayers by remember { mutableStateOf(2) }
@@ -105,12 +164,12 @@ private fun LobbyForm(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        OutlinedButton(
+                        AnimatedOutlinedButton(
                             onClick = { maxPlayers = (maxPlayers - 1).coerceAtLeast(CreateRoomUseCase.MIN_PLAYERS) },
                             enabled = !isLoading
                         ) { Text("−") }
                         Text("$maxPlayers", style = MaterialTheme.typography.headlineSmall)
-                        OutlinedButton(
+                        AnimatedOutlinedButton(
                             onClick = { maxPlayers = (maxPlayers + 1).coerceAtMost(CreateRoomUseCase.MAX_PLAYERS) },
                             enabled = !isLoading
                         ) { Text("+") }
@@ -138,7 +197,7 @@ private fun LobbyForm(
                     )
 
                     val thresholdValue = balanceThresholdPercent.toIntOrNull() ?: 0
-                    Button(
+                    AnimatedButton(
                         onClick = { onCreateRoom(maxPlayers, targetSteps.toIntOrNull() ?: 0, thresholdValue) },
                         enabled = !isLoading && (targetSteps.toIntOrNull() ?: 0) > 0 &&
                             thresholdValue in 1..100,
@@ -171,7 +230,7 @@ private fun LobbyForm(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Button(
+                    AnimatedButton(
                         onClick = { onJoinRoom(joinCode) },
                         enabled = !isLoading && joinCode.length == 4,
                         modifier = Modifier.fillMaxWidth().height(52.dp)
@@ -188,6 +247,8 @@ private fun LobbyForm(
                     }
                 }
             }
+
+            TextButton(onClick = onLogoutClick) { Text("Logout") }
         }
     }
 
@@ -206,14 +267,14 @@ private fun LobbyForm(
 @Composable
 private fun SegmentedTabButton(text: String, selected: Boolean, onClick: () -> Unit) {
     if (selected) {
-        Button(onClick = onClick) { Text(text) }
+        AnimatedButton(onClick = onClick) { Text(text) }
     } else {
-        OutlinedButton(onClick = onClick) { Text(text) }
+        AnimatedOutlinedButton(onClick = onClick) { Text(text) }
     }
 }
 
 @Composable
-private fun WaitingRoomContent(room: Room, onBack: () -> Unit) {
+private fun WaitingRoomContent(room: Room, onBack: () -> Unit, onLogoutClick: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         contentAlignment = Alignment.Center
@@ -250,6 +311,7 @@ private fun WaitingRoomContent(room: Room, onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium
             )
             TextButton(onClick = onBack) { Text("Cancel") }
+            TextButton(onClick = onLogoutClick) { Text("Logout") }
         }
     }
 }

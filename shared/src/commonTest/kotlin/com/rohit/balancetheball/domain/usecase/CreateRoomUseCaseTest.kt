@@ -40,6 +40,13 @@ class CreateRoomUseCaseTest {
         override suspend fun playAgain(code: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun resetOwnProgress(code: String, uid: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun proposePlayAgain(code: String, uid: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun acceptPlayAgain(code: String, uid: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun declinePlayAgain(code: String, uid: String, username: String): Result<Unit> =
+            Result.success(Unit)
     }
 
     @Test

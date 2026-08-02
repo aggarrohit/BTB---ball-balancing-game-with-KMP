@@ -9,9 +9,13 @@ import com.rohit.balancetheball.core.util.currentTimeMillis
 import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.repository.RoomRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
@@ -27,6 +31,12 @@ private const val MAX_DT_SECONDS = 0.1f // clamp huge gaps (e.g. after backgroun
 private const val SENSITIVITY_PX_PER_S2_PER_DEGREE = 30f
 private const val DAMPING_RETAINED_PER_SECOND = 0.35f
 
+/** One-shot events GameScreen should react to exactly once (not sticky state). */
+sealed interface GameEvent {
+    data class PlayerDeclinedPlayAgain(val username: String) : GameEvent
+    data object LeftRoomAfterDecline : GameEvent
+}
+
 class GameViewModel(
     private val roomCode: String,
     private val uid: String,
@@ -37,6 +47,9 @@ class GameViewModel(
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+
+    private val _events = MutableSharedFlow<GameEvent>(extraBufferCapacity = 4)
+    val events: SharedFlow<GameEvent> = _events.asSharedFlow()
 
     private var latestTilt = TiltReading(pitchDegrees = 0f, rollDegrees = 0f)
     private var velocityX = 0f
@@ -55,41 +68,62 @@ class GameViewModel(
     private var hasClaimedVictory = false
     private var progressValidDistancePercent = Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
 
+    private var lastSeenPlayAgainRequestedBy: String? = null
+    private val seenDeclinedUids = mutableSetOf<String>()
+
+    // Tilt/step-counter/physics are paused while the app is backgrounded (see GameScreen's
+    // LifecycleStartEffect); the room observer stays live so multiplayer state keeps updating.
+    private var sensorJobs: List<Job> = emptyList()
+
     init {
-        viewModelScope.launch {
-            tiltSensor.readings().collect { reading ->
-                latestTilt = reading
-            }
-        }
-        viewModelScope.launch {
-            // Only register the step-counter listener once permission is settled — registering
-            // beforehand can leave the sensor silently not delivering events even after a later grant.
-            stepPermissionGranted.filterNotNull().collectLatest { granted ->
-                when {
-                    !granted -> _uiState.update { it.copy(stepsUnavailableReason = "permission denied") }
-                    !stepCounter.isAvailable() -> _uiState.update {
-                        it.copy(stepsUnavailableReason = "no step sensor on this device")
-                    }
-                    else -> {
-                        _uiState.update { it.copy(stepsUnavailableReason = null) }
-                        stepCounter.steps().collect { count -> onRawStepCount(count) }
-                    }
-                }
-            }
-        }
+        startSensorsAndPhysics()
         viewModelScope.launch {
             roomRepository.observeRoom(roomCode).collect { room -> onRoomUpdate(room) }
         }
-        viewModelScope.launch {
-            var lastTimeMillis = currentTimeMillis()
-            while (isActive) {
-                delay(PHYSICS_TICK_MS)
-                val now = currentTimeMillis()
-                val dtSeconds = ((now - lastTimeMillis) / 1000f).coerceAtMost(MAX_DT_SECONDS)
-                lastTimeMillis = now
-                stepPhysics(dtSeconds)
+    }
+
+    private fun startSensorsAndPhysics() {
+        if (sensorJobs.isNotEmpty()) return
+        sensorJobs = listOf(
+            viewModelScope.launch {
+                tiltSensor.readings().collect { reading -> latestTilt = reading }
+            },
+            viewModelScope.launch {
+                // Only register the step-counter listener once permission is settled — registering
+                // beforehand can leave the sensor silently not delivering events even after a later grant.
+                stepPermissionGranted.filterNotNull().collectLatest { granted ->
+                    when {
+                        !granted -> _uiState.update { it.copy(stepsUnavailableReason = "permission denied") }
+                        !stepCounter.isAvailable() -> _uiState.update {
+                            it.copy(stepsUnavailableReason = "no step sensor on this device")
+                        }
+                        else -> {
+                            _uiState.update { it.copy(stepsUnavailableReason = null) }
+                            stepCounter.steps().collect { count -> onRawStepCount(count) }
+                        }
+                    }
+                }
+            },
+            viewModelScope.launch {
+                var lastTimeMillis = currentTimeMillis()
+                while (isActive) {
+                    delay(PHYSICS_TICK_MS)
+                    val now = currentTimeMillis()
+                    val dtSeconds = ((now - lastTimeMillis) / 1000f).coerceAtMost(MAX_DT_SECONDS)
+                    lastTimeMillis = now
+                    stepPhysics(dtSeconds)
+                }
             }
-        }
+        )
+    }
+
+    fun onPauseSensors() {
+        sensorJobs.forEach { it.cancel() }
+        sensorJobs = emptyList()
+    }
+
+    fun onResumeSensors() {
+        startSensorsAndPhysics()
     }
 
     fun onCanvasSizeChanged(widthPx: Float, heightPx: Float) {
@@ -114,8 +148,28 @@ class GameViewModel(
         stepPermissionGranted.value = granted
     }
 
-    fun onPlayAgain() {
-        viewModelScope.launch { roomRepository.playAgain(roomCode) }
+    fun onProposePlayAgain() {
+        viewModelScope.launch {
+            if (_uiState.value.players.size <= 1) {
+                // Solo room — no one else to send a request to, so skip the consent round-trip
+                // and restart immediately.
+                roomRepository.playAgain(roomCode)
+            } else {
+                roomRepository.proposePlayAgain(roomCode, uid)
+            }
+        }
+    }
+
+    fun onAcceptPlayAgain() {
+        viewModelScope.launch { roomRepository.acceptPlayAgain(roomCode, uid) }
+    }
+
+    fun onDeclinePlayAgain() {
+        val username = _uiState.value.players.firstOrNull { it.isSelf }?.username ?: return
+        viewModelScope.launch {
+            roomRepository.declinePlayAgain(roomCode, uid, username)
+            _events.emit(GameEvent.LeftRoomAfterDecline)
+        }
     }
 
     private fun onRawStepCount(rawCount: Int) {
@@ -192,18 +246,53 @@ class GameViewModel(
             }
         }
 
+        val request = room.playAgainRequest
+        if (request?.requestedBy != lastSeenPlayAgainRequestedBy) {
+            // A brand-new request (or the previous one just cleared) — forget which declines we've
+            // already toasted for, so a repeat decliner in a later request isn't silently skipped.
+            seenDeclinedUids.clear()
+            lastSeenPlayAgainRequestedBy = request?.requestedBy
+        }
+        request?.declinedBy?.forEach { (declinedUid, declinedUsername) ->
+            if (declinedUid != uid && seenDeclinedUids.add(declinedUid)) {
+                viewModelScope.launch { _events.emit(GameEvent.PlayerDeclinedPlayAgain(declinedUsername)) }
+            }
+        }
+        // Redundant/idempotent across every client — rule guards prevent double-writes. A denier's
+        // self-removal shrinks room.players.keys, so this naturally needs one fewer acceptance.
+        if (room.status == RoomStatus.FINISHED && request != null &&
+            request.acceptedBy.isNotEmpty() && request.acceptedBy == room.players.keys
+        ) {
+            viewModelScope.launch { roomRepository.playAgain(roomCode) }
+        }
+
+        val playAgainUiInfo = request?.let { req ->
+            PlayAgainUiInfo(
+                requestedByUid = req.requestedBy,
+                requestedByUsername = room.players[req.requestedBy]?.username ?: "Someone",
+                hasAccepted = uid in req.acceptedBy,
+                acceptedCount = req.acceptedBy.size,
+                totalNeeded = room.players.size
+            )
+        }
+
         _uiState.update {
             it.copy(
                 targetSteps = room.targetSteps,
                 progressValidDistancePercent = room.progressValidDistancePercent,
                 players = players,
                 roomStatus = room.status,
-                winnerUsername = winnerUsername
+                winnerUsername = winnerUsername,
+                playAgainRequest = playAgainUiInfo
             )
         }
     }
 
     private fun stepPhysics(dtSeconds: Float) {
+        // Once eliminated the ball is frozen for the rest of the round — it stops responding to
+        // tilt entirely rather than drifting back toward the table.
+        if (localIsEliminated) return
+
         val width = canvasWidthPx ?: return
         val height = canvasHeightPx ?: return
         val tableWidth = tableWidthPx ?: return

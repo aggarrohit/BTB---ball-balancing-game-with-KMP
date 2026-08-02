@@ -29,6 +29,19 @@
               ".write": "auth != null && auth.uid === $uid && (data.val() != true || data.parent().parent().parent().child('status').val() === 'waiting')"
             }
           }
+        },
+        "playAgainRequest": {
+          ".write": "auth != null && data.parent().child('players').child(auth.uid).exists() && ((!data.exists() && newData.child('requestedBy').val() === auth.uid && newData.child('acceptedBy').child(auth.uid).val() === true && !newData.hasChild('declinedBy')) || !newData.exists())",
+          "acceptedBy": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && data.parent().parent().child('requestedBy').exists() && data.parent().parent().parent().child('players').child(auth.uid).exists() && newData.val() === true"
+            }
+          },
+          "declinedBy": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && data.parent().parent().child('requestedBy').exists() && data.parent().parent().parent().child('players').child(auth.uid).exists() && newData.isString()"
+            }
+          }
         }
       }
     }

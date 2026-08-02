@@ -18,6 +18,7 @@ import com.rohit.balancetheball.data.repository.UserRepositoryImpl
 import com.rohit.balancetheball.domain.model.AuthUser
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.usecase.ClaimUsernameUseCase
+import com.rohit.balancetheball.presentation.common.AnimatedButton
 
 private fun suggestUsername(displayName: String?): String =
     displayName.orEmpty().filter { it.isLetterOrDigit() || it == '_' }.take(20)
@@ -99,7 +100,7 @@ private fun UsernameContent(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Button(
+            AnimatedButton(
                 onClick = {
                     keyboard?.hide()
                     onClaimUsername(username)

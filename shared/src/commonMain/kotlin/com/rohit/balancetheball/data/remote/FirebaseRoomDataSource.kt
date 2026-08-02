@@ -2,6 +2,7 @@ package com.rohit.balancetheball.data.remote
 
 import com.rohit.balancetheball.core.config.AppConfig
 import com.rohit.balancetheball.core.util.currentTimeMillis
+import com.rohit.balancetheball.domain.model.PlayAgainRequest
 import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomPlayer
 import com.rohit.balancetheball.domain.model.RoomStatus
@@ -136,7 +137,34 @@ class FirebaseRoomDataSource {
         db.reference().updateChildren(
             mapOf(
                 "rooms/$code/status" to RoomStatus.WAITING.toWireValue(),
-                "rooms/$code/winnerUid" to null
+                "rooms/$code/winnerUid" to null,
+                "rooms/$code/playAgainRequest" to null
+            )
+        )
+    }
+
+    /** Proposes a new round. Written as a single blob so the rule can see requestedBy+acceptedBy together. */
+    suspend fun proposePlayAgain(code: String, uid: String) {
+        db.reference().updateChildren(
+            mapOf(
+                "rooms/$code/playAgainRequest" to mapOf(
+                    "requestedBy" to uid,
+                    "acceptedBy" to mapOf(uid to true)
+                )
+            )
+        )
+    }
+
+    suspend fun acceptPlayAgain(code: String, uid: String) {
+        roomRef(code).child("playAgainRequest/acceptedBy").child(uid).setValue(true)
+    }
+
+    /** Removes the caller from the room and records their decline so others can be notified. */
+    suspend fun declinePlayAgain(code: String, uid: String, username: String) {
+        db.reference().updateChildren(
+            mapOf(
+                "rooms/$code/players/$uid" to null,
+                "rooms/$code/playAgainRequest/declinedBy/$uid" to username
             )
         )
     }
@@ -168,6 +196,18 @@ class FirebaseRoomDataSource {
             )
         }.toMap()
 
+        val requestMap = map["playAgainRequest"] as? Map<String, Any?>
+        val playAgainRequest = requestMap?.let { req ->
+            val requestedBy = req["requestedBy"] as? String ?: return@let null
+            val acceptedByMap = req["acceptedBy"] as? Map<String, Any?> ?: emptyMap()
+            val declinedByMap = req["declinedBy"] as? Map<String, Any?> ?: emptyMap()
+            PlayAgainRequest(
+                requestedBy = requestedBy,
+                acceptedBy = acceptedByMap.keys,
+                declinedBy = declinedByMap.mapValues { (_, username) -> username as? String ?: "" }
+            )
+        }
+
         return Room(
             code = map["code"] as? String ?: code,
             hostUid = map["hostUid"] as? String ?: return null,
@@ -178,7 +218,8 @@ class FirebaseRoomDataSource {
             status = RoomStatus.fromWireValue(map["status"] as? String),
             winnerUid = map["winnerUid"] as? String,
             createdAt = map["createdAt"] as? Long ?: 0L,
-            players = players
+            players = players,
+            playAgainRequest = playAgainRequest
         )
     }
 }

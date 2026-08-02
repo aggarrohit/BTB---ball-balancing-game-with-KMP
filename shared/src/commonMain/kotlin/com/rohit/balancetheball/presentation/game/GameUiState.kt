@@ -11,6 +11,15 @@ data class PlayerProgress(
     val isSelf: Boolean
 )
 
+/** An in-flight play-again request as seen by this client. Null once resolved/cleared or if none is active. */
+data class PlayAgainUiInfo(
+    val requestedByUid: String,
+    val requestedByUsername: String,
+    val hasAccepted: Boolean,
+    val acceptedCount: Int,
+    val totalNeeded: Int
+)
+
 /** All values needed to render the game screen. Ball position is in px, relative to the canvas origin. */
 data class GameUiState(
     val ballX: Float = 0f,
@@ -26,5 +35,6 @@ data class GameUiState(
     val isEliminated: Boolean = false,
     val players: List<PlayerProgress> = emptyList(),
     val roomStatus: RoomStatus = RoomStatus.IN_PROGRESS,
-    val winnerUsername: String? = null
+    val winnerUsername: String? = null,
+    val playAgainRequest: PlayAgainUiInfo? = null
 )
