@@ -212,6 +212,16 @@ fun GameScreen(
             }
         }
 
+        uiState.countdownSecondsRemaining?.let { secondsRemaining ->
+            Text(
+                text = "$secondsRemaining",
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
         GlassCard(
             modifier = Modifier
                 .align(Alignment.TopStart)

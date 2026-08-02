@@ -36,5 +36,7 @@ data class GameUiState(
     val players: List<PlayerProgress> = emptyList(),
     val roomStatus: RoomStatus = RoomStatus.IN_PROGRESS,
     val winnerUsername: String? = null,
-    val playAgainRequest: PlayAgainUiInfo? = null
+    val playAgainRequest: PlayAgainUiInfo? = null,
+    /** Non-null while the post-restart countdown is showing; ticks down to null once it hits zero. */
+    val countdownSecondsRemaining: Int? = null
 )

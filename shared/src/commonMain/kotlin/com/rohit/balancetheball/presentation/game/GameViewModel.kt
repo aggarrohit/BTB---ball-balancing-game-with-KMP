@@ -32,6 +32,14 @@ private const val MAX_DT_SECONDS = 0.1f // clamp huge gaps (e.g. after backgroun
 private const val SENSITIVITY_PX_PER_S2_PER_DEGREE = 30f
 private const val DAMPING_RETAINED_PER_SECOND = 0.35f
 
+// A brief freeze right as a round starts: the ball is held at center and elimination can't fire.
+// This isn't just cosmetic — every player resets their own progress independently (self-write
+// only, no one else is allowed to touch it), so there's a real window right after a "Play Again"
+// restart where some players' `isEliminated` is still stale from the previous round. Without this
+// grace period, the "everyone's eliminated -> end with no winner" check could fire on that stale
+// data and end the new round before it visibly began.
+private const val COUNTDOWN_MS = 3000L
+
 /** One-shot events GameScreen should react to exactly once (not sticky state). */
 sealed interface GameEvent {
     data class PlayerDeclinedPlayAgain(val username: String) : GameEvent
@@ -73,6 +81,10 @@ class GameViewModel(
     private var lastSeenPlayAgainRequestedBy: String? = null
     private val seenDeclinedUids = mutableSetOf<String>()
     private var lastRecordedHistoryRoundId: String? = null
+
+    private var currentRoundStartedAt: Long? = null
+    private var lastCountdownRoundStartedAt: Long? = null
+    private var countdownJob: Job? = null
 
     // Tilt/step-counter/physics are paused while the app is backgrounded (see GameScreen's
     // LifecycleStartEffect); the room observer stays live so multiplayer state keeps updating.
@@ -197,6 +209,8 @@ class GameViewModel(
         if (room == null) return
 
         progressValidDistancePercent = room.progressValidDistancePercent
+        currentRoundStartedAt = room.roundStartedAt
+        maybeStartCountdown(room.roundStartedAt)
 
         val self = room.players[uid]
         if (self != null && !hasSeededFromRoom) {
@@ -219,11 +233,24 @@ class GameViewModel(
                 it.copy(
                     validSteps = 0,
                     isEliminated = false,
+                    distanceFraction = 0f,
                     ballX = if (width != null) width / 2f else it.ballX,
                     ballY = if (height != null) height / 2f else it.ballY
                 )
             }
             viewModelScope.launch { roomRepository.resetOwnProgress(roomCode, uid) }
+        }
+
+        // Restarting the round after "Play Again": each player's reset above is self-written (no
+        // one else may touch it), so this only flips the room back to in_progress once every
+        // player's own reset has actually landed — avoiding a race against stale isEliminated data
+        // from the previous round. Redundant/idempotent across every client — the status rule only
+        // allows this transition once. (LobbyViewModel drives the room's very first start; this is
+        // what drives every restart after that, since players are back in GameScreen by then.)
+        if (room.status == RoomStatus.WAITING && room.players.isNotEmpty() &&
+            room.players.values.all { it.validSteps == 0 && !it.isEliminated }
+        ) {
+            viewModelScope.launch { roomRepository.tryStartIfFull(roomCode) }
         }
 
         val players = room.players.values.map { player ->
@@ -247,7 +274,8 @@ class GameViewModel(
         }
 
         // Redundant/idempotent on every client — rule guards on the server prevent double-writes.
-        if (room.status == RoomStatus.IN_PROGRESS && room.winnerUid == null) {
+        // Suppressed during the post-restart grace period — see COUNTDOWN_MS.
+        if (room.status == RoomStatus.IN_PROGRESS && room.winnerUid == null && !isInGracePeriod(room.roundStartedAt)) {
             val activePlayers = room.players.values.filterNot { it.isEliminated }
             when {
                 activePlayers.isEmpty() -> viewModelScope.launch { roomRepository.endWithoutWinner(roomCode) }
@@ -299,10 +327,32 @@ class GameViewModel(
         }
     }
 
+    private fun isInGracePeriod(roundStartedAt: Long?): Boolean =
+        roundStartedAt != null && currentTimeMillis() - roundStartedAt < COUNTDOWN_MS
+
+    /** Starts (or restarts, for a later round) a local 3-2-1 countdown ticker anchored to the shared [roundStartedAt] — same value on every client, so latecomers see the correctly-shortened remainder instead of always starting from 3. */
+    private fun maybeStartCountdown(roundStartedAt: Long?) {
+        if (roundStartedAt == null || roundStartedAt == lastCountdownRoundStartedAt) return
+        lastCountdownRoundStartedAt = roundStartedAt
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            while (isActive) {
+                val remainingMs = COUNTDOWN_MS - (currentTimeMillis() - roundStartedAt)
+                if (remainingMs <= 0) break
+                val secondsRemaining = ((remainingMs + 999L) / 1000L).toInt() // ceil to whole seconds: 3, 2, 1
+                _uiState.update { it.copy(countdownSecondsRemaining = secondsRemaining) }
+                delay(100L)
+            }
+            _uiState.update { it.copy(countdownSecondsRemaining = null) }
+        }
+    }
+
     private fun stepPhysics(dtSeconds: Float) {
         // Once eliminated the ball is frozen for the rest of the round — it stops responding to
         // tilt entirely rather than drifting back toward the table.
         if (localIsEliminated) return
+        // Held at center during the post-restart countdown — see COUNTDOWN_MS.
+        if (isInGracePeriod(currentRoundStartedAt)) return
 
         val width = canvasWidthPx ?: return
         val height = canvasHeightPx ?: return
