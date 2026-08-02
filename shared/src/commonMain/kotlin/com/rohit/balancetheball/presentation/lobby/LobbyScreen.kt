@@ -39,6 +39,7 @@ fun LobbyScreen(
     user: User,
     onRoomStarted: (roomCode: String) -> Unit,
     onLoggedOut: () -> Unit,
+    onHistoryClick: () -> Unit,
     navKey: Long = 0L,
     authRepository: AuthRepository = remember { FirebaseAuthRepository() },
     viewModel: LobbyViewModel = viewModel(key = navKey.toString()) {
@@ -83,7 +84,8 @@ fun LobbyScreen(
             onCreateRoom = viewModel::onCreateRoom,
             onJoinRoom = viewModel::onJoinRoom,
             onDismissError = viewModel::resetState,
-            onLogoutClick = { showLogoutConfirm = true }
+            onLogoutClick = { showLogoutConfirm = true },
+            onHistoryClick = onHistoryClick
         )
     }
 
@@ -128,7 +130,8 @@ private fun LobbyForm(
     onCreateRoom: (maxPlayers: Int, targetSteps: Int, progressValidDistancePercent: Int) -> Unit,
     onJoinRoom: (code: String) -> Unit,
     onDismissError: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onHistoryClick: () -> Unit
 ) {
     var tab by remember { mutableStateOf(LobbyTab.CREATE) }
     var maxPlayers by remember { mutableStateOf(2) }
@@ -252,7 +255,10 @@ private fun LobbyForm(
                         }
                     }
 
-                    TextButton(onClick = onLogoutClick) { Text("Logout") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = onHistoryClick) { Text("History") }
+                        TextButton(onClick = onLogoutClick) { Text("Logout") }
+                    }
                 }
             }
         }

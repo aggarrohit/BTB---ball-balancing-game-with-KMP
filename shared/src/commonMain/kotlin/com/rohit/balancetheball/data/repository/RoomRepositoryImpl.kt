@@ -1,10 +1,12 @@
 package com.rohit.balancetheball.data.repository
 
+import com.rohit.balancetheball.core.util.currentTimeMillis
 import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
 import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.repository.RoomRepository
 import kotlinx.coroutines.flow.Flow
+import kotlin.random.Random
 
 class RoomRepositoryImpl(
     private val dataSource: FirebaseRoomDataSource
@@ -37,8 +39,11 @@ class RoomRepositoryImpl(
     override suspend fun tryStartIfFull(code: String): Result<Unit> = runCatching {
         // Redundant/rejected calls (room already started, or not actually full yet) are expected
         // and harmless — every client may attempt this, only the room Flow reflects the true state.
+        // The status rule only allows this transition once, so even though every client generates
+        // its own candidate roundId, only one write (and thus one roundId) actually lands.
         try {
-            dataSource.setStatus(code, RoomStatus.IN_PROGRESS)
+            val roundId = "$code-${currentTimeMillis()}-${Random.nextInt(1000, 9999)}"
+            dataSource.startRound(code, roundId, currentTimeMillis())
         } catch (_: Exception) {
             // ignored — see above
         }

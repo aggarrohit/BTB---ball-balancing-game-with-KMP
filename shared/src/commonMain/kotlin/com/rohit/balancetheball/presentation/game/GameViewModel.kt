@@ -8,6 +8,7 @@ import com.rohit.balancetheball.core.sensor.TiltSensor
 import com.rohit.balancetheball.core.util.currentTimeMillis
 import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomStatus
+import com.rohit.balancetheball.domain.repository.HistoryRepository
 import com.rohit.balancetheball.domain.repository.RoomRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -42,7 +43,8 @@ class GameViewModel(
     private val uid: String,
     private val tiltSensor: TiltSensor,
     private val stepCounter: StepCounter,
-    private val roomRepository: RoomRepository
+    private val roomRepository: RoomRepository,
+    private val historyRepository: HistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GameUiState())
@@ -70,6 +72,7 @@ class GameViewModel(
 
     private var lastSeenPlayAgainRequestedBy: String? = null
     private val seenDeclinedUids = mutableSetOf<String>()
+    private var lastRecordedHistoryRoundId: String? = null
 
     // Tilt/step-counter/physics are paused while the app is backgrounded (see GameScreen's
     // LifecycleStartEffect); the room observer stays live so multiplayer state keeps updating.
@@ -234,6 +237,14 @@ class GameViewModel(
         }.sortedByDescending { it.validSteps }
 
         val winnerUsername = room.winnerUid?.let { winnerUid -> room.players[winnerUid]?.username }
+
+        // Fires once per (uid, roundId) per client — a fresh roundId only appears after the next
+        // Play Again, so this naturally re-arms for each new round. Self-write only, so unlike the
+        // other "redundant across every client" writes below, there's no other client to race with.
+        if (room.status == RoomStatus.FINISHED && room.roundId != null && room.roundId != lastRecordedHistoryRoundId) {
+            lastRecordedHistoryRoundId = room.roundId
+            viewModelScope.launch { historyRepository.recordGameHistory(room, uid) }
+        }
 
         // Redundant/idempotent on every client — rule guards on the server prevent double-writes.
         if (room.status == RoomStatus.IN_PROGRESS && room.winnerUid == null) {

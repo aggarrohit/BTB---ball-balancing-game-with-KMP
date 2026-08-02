@@ -24,6 +24,7 @@ import com.rohit.balancetheball.domain.repository.UserRepository
 import com.rohit.balancetheball.presentation.auth.SignInScreen
 import com.rohit.balancetheball.presentation.common.ThemeMenu
 import com.rohit.balancetheball.presentation.game.GameScreen
+import com.rohit.balancetheball.presentation.history.HistoryScreen
 import com.rohit.balancetheball.presentation.lobby.LobbyScreen
 import com.rohit.balancetheball.presentation.username.UsernameScreen
 import com.rohit.balancetheball.core.util.currentTimeMillis
@@ -42,6 +43,7 @@ private sealed interface AppRoute {
     data class NeedsUsername(val authUser: AuthUser) : AppRoute
     data class InLobby(val user: User, val navKey: Long = currentTimeMillis()) : AppRoute
     data class InRoom(val user: User, val roomCode: String) : AppRoute
+    data class InHistory(val user: User, val navKey: Long = currentTimeMillis()) : AppRoute
 }
 
 @Composable
@@ -91,7 +93,8 @@ fun App(
                         user = currentRoute.user,
                         navKey = currentRoute.navKey,
                         onRoomStarted = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) },
-                        onLoggedOut = { route = AppRoute.SignedOut() }
+                        onLoggedOut = { route = AppRoute.SignedOut() },
+                        onHistoryClick = { route = AppRoute.InHistory(currentRoute.user) }
                     )
                 }
                 is AppRoute.InRoom -> {
@@ -100,6 +103,13 @@ fun App(
                         roomCode = currentRoute.roomCode,
                         onExitGame = { route = AppRoute.InLobby(currentRoute.user) },
                         onLoggedOut = { route = AppRoute.SignedOut() }
+                    )
+                }
+                is AppRoute.InHistory -> {
+                    HistoryScreen(
+                        user = currentRoute.user,
+                        navKey = currentRoute.navKey,
+                        onBack = { route = AppRoute.InLobby(currentRoute.user) }
                     )
                 }
             }

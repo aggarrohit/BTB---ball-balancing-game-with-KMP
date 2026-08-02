@@ -124,6 +124,22 @@ class FirebaseRoomDataSource {
         roomRef(code).child("status").setValue(status.toWireValue())
     }
 
+    /**
+     * Flips a waiting room to in_progress and stamps a fresh [roundId] in the same atomic write.
+     * The room's status rule only allows the waiting->in_progress transition once, so even though
+     * every client redundantly attempts this (see RoomRepository docs), only one write — and thus
+     * one client's locally-generated roundId — actually lands.
+     */
+    suspend fun startRound(code: String, roundId: String, startedAt: Long) {
+        db.reference().updateChildren(
+            mapOf(
+                "rooms/$code/status" to RoomStatus.IN_PROGRESS.toWireValue(),
+                "rooms/$code/roundId" to roundId,
+                "rooms/$code/roundStartedAt" to startedAt
+            )
+        )
+    }
+
     suspend fun claimVictory(code: String, uid: String) {
         db.reference().updateChildren(
             mapOf(
@@ -138,7 +154,9 @@ class FirebaseRoomDataSource {
             mapOf(
                 "rooms/$code/status" to RoomStatus.WAITING.toWireValue(),
                 "rooms/$code/winnerUid" to null,
-                "rooms/$code/playAgainRequest" to null
+                "rooms/$code/playAgainRequest" to null,
+                "rooms/$code/roundId" to null,
+                "rooms/$code/roundStartedAt" to null
             )
         )
     }
@@ -219,7 +237,9 @@ class FirebaseRoomDataSource {
             winnerUid = map["winnerUid"] as? String,
             createdAt = map["createdAt"] as? Long ?: 0L,
             players = players,
-            playAgainRequest = playAgainRequest
+            playAgainRequest = playAgainRequest,
+            roundId = map["roundId"] as? String,
+            roundStartedAt = map["roundStartedAt"] as? Long
         )
     }
 }

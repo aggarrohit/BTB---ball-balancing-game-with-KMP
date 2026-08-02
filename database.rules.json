@@ -22,6 +22,12 @@
         "winnerUid": {
           ".write": "auth != null && data.parent().child('players').child(auth.uid).exists() && (!data.exists() || newData.val() === null)"
         },
+        "roundId": {
+          ".write": "auth != null && data.parent().child('players').child(auth.uid).exists() && ((!data.exists() && newData.isString()) || (data.exists() && newData.val() === null))"
+        },
+        "roundStartedAt": {
+          ".write": "auth != null && data.parent().child('players').child(auth.uid).exists() && ((!data.exists() && newData.isNumber()) || (data.exists() && newData.val() === null))"
+        },
         "players": {
           "$uid": {
             ".write": "auth != null && auth.uid === $uid && (data.exists() || data.parent().parent().child('status').val() === 'waiting')",
@@ -42,6 +48,24 @@
               ".write": "auth != null && auth.uid === $uid && data.parent().parent().child('requestedBy').exists() && data.parent().parent().parent().child('players').child(auth.uid).exists() && newData.isString()"
             }
           }
+        }
+      }
+    },
+    "gameHistory": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".indexOn": "finishedAt",
+        "$roundId": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists()"
+        }
+      }
+    },
+    "opponents": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".indexOn": "lastPlayedAt",
+        "$opponentUid": {
+          ".write": "auth != null && auth.uid === $uid"
         }
       }
     }

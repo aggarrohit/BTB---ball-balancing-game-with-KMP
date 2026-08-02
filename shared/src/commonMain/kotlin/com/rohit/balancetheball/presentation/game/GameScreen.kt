@@ -56,7 +56,9 @@ import com.rohit.balancetheball.core.sensor.RequestStepPermission
 import com.rohit.balancetheball.core.sensor.StepCounter
 import com.rohit.balancetheball.core.sensor.TiltSensor
 import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
+import com.rohit.balancetheball.data.remote.FirebaseHistoryDataSource
 import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
+import com.rohit.balancetheball.data.repository.HistoryRepositoryImpl
 import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
@@ -89,7 +91,8 @@ fun GameScreen(
             uid = user.uid,
             tiltSensor = TiltSensor(),
             stepCounter = StepCounter(),
-            roomRepository = RoomRepositoryImpl(FirebaseRoomDataSource())
+            roomRepository = RoomRepositoryImpl(FirebaseRoomDataSource()),
+            historyRepository = HistoryRepositoryImpl(FirebaseHistoryDataSource())
         )
     }
 ) {

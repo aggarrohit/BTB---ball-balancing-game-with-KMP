@@ -49,7 +49,10 @@ data class Room(
     val winnerUid: String? = null,
     val createdAt: Long = 0L,
     val players: Map<String, RoomPlayer> = emptyMap(),
-    val playAgainRequest: PlayAgainRequest? = null
+    val playAgainRequest: PlayAgainRequest? = null,
+    /** Stable for exactly one round (waiting->in_progress->finished); null/cleared on playAgain's reset back to waiting. Rooms are reused across rounds, so this — not the room code — is what a history record keys off of. */
+    val roundId: String? = null,
+    val roundStartedAt: Long? = null
 ) {
     companion object {
         const val DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT = 15
