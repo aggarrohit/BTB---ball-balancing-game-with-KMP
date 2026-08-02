@@ -1,31 +1,114 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# Balance The Ball
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+A multiplayer, sensor-based mobile game built with Kotlin Multiplatform. Tilt your phone to keep a
+ball balanced at the center of a table, walk to make progress, and race friends to be the first to
+reach the target step count.
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+## How to Play
 
-### Running the apps
+1. Sign in with Google.
+2. Pick a username (unique, one-time).
+3. From the Lobby, either **create a room** (choose player count, target steps to win, and a
+   balance threshold) or **join a room** with a 4-digit code.
+4. Once the room fills up, the round starts automatically for everyone.
+5. Tilt your phone to keep the ball near the center of the table — the current distance from
+   center is shown as a percentage.
+6. Steps only count toward your progress while the ball stays within the room's balance
+   threshold. Walk to rack up valid steps.
+7. Tilt too far and the ball falls off the table — you're eliminated for the round, but can keep
+   watching everyone else's progress live.
+8. First player to reach the target step count wins. If everyone falls off before that happens,
+   the round ends with no winner.
+9. **Play Again** requires everyone still in the room to agree: the requester's tap sends every
+   other player a Play/Deny prompt. Deny and you leave the room; the rest can still play on.
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+## Features
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+- Google Sign-In (Firebase Auth) with persistent sessions across app restarts
+- Real-time multiplayer rooms via Firebase Realtime Database — 1 to 10 players (1 doubles as solo
+  practice)
+- Live tilt + step-count sensors on both Android and iOS
+- Per-room configurable win condition (target steps) and difficulty (balance threshold %)
+- Live opponent progress, elimination state, and win/no-winner end states
+- Play-again consent flow with graceful player removal on decline
+- Background-aware gameplay — sensors pause automatically when the app leaves the foreground
+- System back-button handling (confirms before exiting a game or the app)
 
-### Running tests
+## Tech Stack
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+- **Kotlin Multiplatform** (Android + iOS) with **Compose Multiplatform** for a fully shared UI —
+  no per-platform UI code
+- Clean-ish layering (`domain` / `data` / `presentation`), with `expect`/`actual` for
+  platform-specific sensor and OS integration
+- **Firebase Realtime Database** + **Firebase Auth**, via the [gitlive](https://github.com/GitLiveApp/firebase-kotlin-sdk)
+  multiplatform Firebase SDK, enforced by Realtime Database security rules (see
+  `database.rules.json`) — no backend server
+- Sensors: Android `SensorManager` (rotation vector for tilt, step detector for steps); iOS
+  CoreMotion (device motion + `CMPedometer`)
+- Google Sign-In: Android via Credential Manager; iOS via the GoogleSignIn-iOS SDK, bridged into
+  Kotlin through a small Swift-implemented interface (no CocoaPods in this project)
+- GitHub Actions CI — build + unit tests on every push/PR
 
-- Android tests: `./gradlew :shared:testAndroidHostTest`
-- iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
+## Project Structure
+
+- `/androidApp` — Android application module (entry point, manifest, launcher icon)
+- `/iosApp` — iOS Xcode project (entry point, Swift bridge for Google Sign-In)
+- `/shared` — all shared Kotlin code
+  - `commonMain` — shared UI (Compose) and business logic (`domain`, `data`, `presentation`)
+  - `androidMain` / `iosMain` — platform-specific implementations (sensors, auth, config)
+- `database.rules.json` — Firebase Realtime Database security rules
+- `.github/workflows/android-ci.yml` — CI: build + test on every push/PR
+
+## Setup
+
+### 1. Firebase project
+
+Create a Firebase project with:
+- **Realtime Database** enabled — publish the rules from `database.rules.json` under
+  Realtime Database → Rules
+- **Authentication** → Sign-in method → **Google** provider enabled
+
+Download and place (both gitignored — never commit them):
+- `androidApp/google-services.json`
+- `iosApp/iosApp/GoogleService-Info.plist`
+
+### 2. Local config
+
+Copy `local.properties.template` to `local.properties` and fill in:
+- `FIREBASE_DATABASE_URL`
+- `FIREBASE_PROJECT_ID`
+- `GOOGLE_WEB_CLIENT_ID` — from Firebase Console → Authentication → Sign-in method → Google →
+  "Web client (auto created by Google Service)"
+
+### 3. iOS Google Sign-In
+
+In Xcode, add the `GoogleSignIn-iOS` SPM package to the `iosApp` target, then add the
+`REVERSED_CLIENT_ID` value (from `GoogleService-Info.plist`) as a URL scheme in `Info.plist`.
+
+## Running
+
+- Android: `./gradlew :androidApp:assembleDebug`, or the IDE run configuration
+- iOS: open `/iosApp` in Xcode and run from there
+
+## Testing
+
+- Shared unit tests: `./gradlew :shared:testAndroidHostTest`
+- iOS unit tests: `./gradlew :shared:iosSimulatorArm64Test`
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/android-ci.yml`) builds the Android app and runs shared unit
+tests on every push/PR to `main`. Deployment to Google Play isn't wired up yet (pending Play
+Developer account activation).
+
+## Known Limitations
+
+- The iOS app icon is still the default placeholder — the Android launcher icon has a custom ball
+  icon, but the iOS equivalent needs real raster assets this environment can't generate.
+- A few guarantees (e.g. room join capacity) are enforced client-side rather than via Firebase
+  rules — a deliberate, documented trade-off for a casual game, not hardened against a determined
+  cheater.
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+Built on the [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html) project template.
