@@ -25,6 +25,14 @@ data class GameUiState(
     val ballX: Float = 0f,
     val ballY: Float = 0f,
     val ballReady: Boolean = false,
+    /** The ball's cumulative roll, as a unit quaternion (defaults to identity — no rotation).
+     * Composed incrementally in GameViewModel from real rolling-without-slipping physics, so it
+     * stays correct through direction changes instead of drifting like independent per-axis
+     * Euler angles would. */
+    val ballRotationW: Float = 1f,
+    val ballRotationX: Float = 0f,
+    val ballRotationY: Float = 0f,
+    val ballRotationZ: Float = 0f,
     /** 0.0 at the table's center, 1.0 exactly at its edge, >1.0 once off the table. */
     val distanceFraction: Float = 0f,
     val stepCount: Int = 0,

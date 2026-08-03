@@ -24,8 +24,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private const val PHYSICS_TICK_MS = 16L
 private const val MAX_DT_SECONDS = 0.1f // clamp huge gaps (e.g. after backgrounding) so the ball doesn't jump
@@ -74,6 +77,7 @@ class GameViewModel(
     private var lastRawStepCount = 0
     private var localValidSteps = 0
     private var localIsEliminated = false
+    private var ballRotation = Quaternion.IDENTITY
     private var hasSeededFromRoom = false
     private var hasClaimedVictory = false
     private var progressValidDistancePercent = Room.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
@@ -227,6 +231,7 @@ class GameViewModel(
             hasClaimedVictory = false
             velocityX = 0f
             velocityY = 0f
+            ballRotation = Quaternion.IDENTITY
             val width = canvasWidthPx
             val height = canvasHeightPx
             _uiState.update {
@@ -234,6 +239,10 @@ class GameViewModel(
                     validSteps = 0,
                     isEliminated = false,
                     distanceFraction = 0f,
+                    ballRotationW = Quaternion.IDENTITY.w,
+                    ballRotationX = Quaternion.IDENTITY.x,
+                    ballRotationY = Quaternion.IDENTITY.y,
+                    ballRotationZ = Quaternion.IDENTITY.z,
                     ballX = if (width != null) width / 2f else it.ballX,
                     ballY = if (height != null) height / 2f else it.ballY
                 )
@@ -408,12 +417,39 @@ class GameViewModel(
             viewModelScope.launch { roomRepository.markEliminated(roomCode, uid) }
         }
 
+        // Rolling-without-slipping: for a sphere on a plane, the angular velocity is (surfaceNormal
+        // × velocity) / radius — surfaceNormal is (0,0,1) since the camera looks straight at the
+        // ball. The rotation math (and RollingBall's rendering) treats "up" as positive, the usual
+        // 3D convention, but screen-space dy is *down*-positive — velocity has to be flipped to
+        // (dx, -dy, 0) before the cross product, giving axis (dy, dx, 0)/|v|, angle = distance/radius.
+        // Composed (not just added) into the running rotation via quaternion multiplication, so it
+        // stays correct through direction changes instead of drifting like independently
+        // accumulated X/Y Euler angles did (that's what made the roll look wrong part of the time).
+        if (ballRadiusPx > 0f) {
+            val dx = newX - current.ballX
+            val dy = newY - current.ballY
+            val distanceMoved = sqrt(dx * dx + dy * dy)
+            if (distanceMoved > 0f) {
+                val angle = distanceMoved / ballRadiusPx
+                val half = angle / 2f
+                val sinHalf = sin(half)
+                val axisX = dy / distanceMoved
+                val axisY = dx / distanceMoved
+                val delta = Quaternion(cos(half), axisX * sinHalf, axisY * sinHalf, 0f)
+                ballRotation = (delta * ballRotation).normalized()
+            }
+        }
+
         _uiState.update {
             it.copy(
                 ballX = newX,
                 ballY = newY,
                 distanceFraction = distanceFraction,
-                isEliminated = localIsEliminated
+                isEliminated = localIsEliminated,
+                ballRotationW = ballRotation.w,
+                ballRotationX = ballRotation.x,
+                ballRotationY = ballRotation.y,
+                ballRotationZ = ballRotation.z
             )
         }
     }

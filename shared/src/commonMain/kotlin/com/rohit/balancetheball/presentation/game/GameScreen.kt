@@ -39,7 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -48,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,7 +68,10 @@ import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.GlassCard
 import kotlinx.coroutines.launch
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private val BALL_RADIUS = 24.dp
 private val CENTER_MARKER_RADIUS = 5.dp
@@ -208,7 +212,15 @@ fun GameScreen(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "⚽", fontSize = (BALL_RADIUS.value * 1.8f).sp)
+                RollingBall(
+                    rotation = Quaternion(
+                        w = uiState.ballRotationW,
+                        x = uiState.ballRotationX,
+                        y = uiState.ballRotationY,
+                        z = uiState.ballRotationZ
+                    ),
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
 
@@ -367,6 +379,110 @@ fun GameScreen(
                         TextButton(onClick = { viewModel.onDeclinePlayAgain() }) { Text("Deny") }
                     }
                 )
+            }
+        }
+    }
+}
+
+// The 12 vertices of a regular icosahedron, normalized to the unit sphere — used as pentagon
+// centers so the drawn pattern reads as a soccer ball. Coordinates use the golden ratio, the
+// standard construction (all cyclic permutations of (0, ±1, ±φ)).
+private val ICOSAHEDRON_VERTICES: List<Triple<Float, Float, Float>> = run {
+    val phi = 1.618034f
+    val raw = listOf(
+        Triple(0f, 1f, phi), Triple(0f, 1f, -phi), Triple(0f, -1f, phi), Triple(0f, -1f, -phi),
+        Triple(1f, phi, 0f), Triple(1f, -phi, 0f), Triple(-1f, phi, 0f), Triple(-1f, -phi, 0f),
+        Triple(phi, 0f, 1f), Triple(phi, 0f, -1f), Triple(-phi, 0f, 1f), Triple(-phi, 0f, -1f)
+    )
+    raw.map { (x, y, z) ->
+        val length = sqrt(x * x + y * y + z * z)
+        Triple(x / length, y / length, z / length)
+    }
+}
+
+// Same palette as BallLogo.kt (Twemoji soccer ball, CC-BY 4.0) so the in-game ball and the
+// sign-in/logo ball read as the same object.
+private val BALL_BASE_COLOR = Color(0xFFF5F8FA)
+private val BALL_SHADOW_COLOR = Color(0xFFCCD6DD)
+private val BALL_PENTAGON_COLOR = Color(0xFF31373D)
+
+/** How far each pentagon's corners sit from its center, in unit-sphere (tangent-plane) units. */
+private const val PENTAGON_CORNER_OFFSET = 0.42f
+
+private typealias Vec3 = Triple<Float, Float, Float>
+
+private data class SpherePentagon(val center: Vec3, val corners: List<Vec3>)
+
+private fun Vec3.normalized(): Vec3 {
+    val (x, y, z) = this
+    val length = sqrt(x * x + y * y + z * z)
+    return Triple(x / length, y / length, z / length)
+}
+
+private fun cross(a: Vec3, b: Vec3): Vec3 = Triple(
+    a.second * b.third - a.third * b.second,
+    a.third * b.first - a.first * b.third,
+    a.first * b.second - a.second * b.first
+)
+
+// A pentagon "sticker" tangent to the sphere at each icosahedron vertex: its 5 corners are laid
+// out in the local tangent plane, then re-normalized onto the sphere. Rotating and projecting
+// each corner individually (not just the center, scaled) is what gives real foreshortening —
+// pentagons compress into slivers near the rim like an actual projected polygon would, instead of
+// just shrinking uniformly in place.
+private val SPHERE_PENTAGONS: List<SpherePentagon> = ICOSAHEDRON_VERTICES.map { v ->
+    val arbitrary: Vec3 = if (kotlin.math.abs(v.second) < 0.9f) Triple(0f, 1f, 0f) else Triple(1f, 0f, 0f)
+    val tangentU = cross(arbitrary, v).normalized()
+    val tangentW = cross(v, tangentU)
+    val corners = (0 until 5).map { i ->
+        val angle = -kotlin.math.PI.toFloat() / 2f + i * (2f * kotlin.math.PI.toFloat() / 5f)
+        val cosA = cos(angle) * PENTAGON_CORNER_OFFSET
+        val sinA = sin(angle) * PENTAGON_CORNER_OFFSET
+        Triple(
+            v.first + cosA * tangentU.first + sinA * tangentW.first,
+            v.second + cosA * tangentU.second + sinA * tangentW.second,
+            v.third + cosA * tangentU.third + sinA * tangentW.third
+        ).normalized()
+    }
+    SpherePentagon(center = v, corners = corners)
+}
+
+/**
+ * A genuinely rotating sphere, not a warped flat image: every pentagon corner is a real 3D
+ * coordinate on a unit sphere, rotated by [rotation] (composed frame-to-frame in GameViewModel
+ * from real rolling physics — see Quaternion.kt) and projected to 2D every frame, corner by
+ * corner — not just the pentagon's center, scaled — so pentagons genuinely foreshorten (compress
+ * toward a sliver) near the rim instead of just shrinking in place. The outer circle itself is
+ * never distorted, so the ball never squishes or flips like a flat sprite would.
+ */
+@Composable
+private fun RollingBall(rotation: Quaternion, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val radius = size.minDimension / 2f
+        val center = Offset(size.width / 2f, size.height / 2f)
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.White, BALL_BASE_COLOR, BALL_SHADOW_COLOR),
+                center = Offset(center.x - radius * 0.35f, center.y - radius * 0.35f),
+                radius = radius * 1.7f
+            ),
+            radius = radius,
+            center = center
+        )
+
+        SPHERE_PENTAGONS.forEach { pentagon ->
+            val (_, _, centerZ) = rotation.rotate(pentagon.center.first, pentagon.center.second, pentagon.center.third)
+            if (centerZ > 0f) {
+                val path = Path()
+                pentagon.corners.forEachIndexed { i, corner ->
+                    val (x1, y1, _) = rotation.rotate(corner.first, corner.second, corner.third)
+                    val screenX = center.x + x1 * radius
+                    val screenY = center.y - y1 * radius
+                    if (i == 0) path.moveTo(screenX, screenY) else path.lineTo(screenX, screenY)
+                }
+                path.close()
+                drawPath(path = path, color = BALL_PENTAGON_COLOR)
             }
         }
     }
