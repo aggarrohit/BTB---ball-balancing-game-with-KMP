@@ -38,7 +38,7 @@ fun InviteResponseScreen(
     invite: PendingInvite,
     onJoined: (roomCode: String) -> Unit,
     onDismiss: () -> Unit,
-    viewModel: InviteResponseViewModel = viewModel(key = invite.inviteId) {
+    viewModel: InviteResponseViewModel = viewModel {
         // Manual dependency wiring — swap in a DI framework when needed
         InviteResponseViewModel(
             uid = user.uid,

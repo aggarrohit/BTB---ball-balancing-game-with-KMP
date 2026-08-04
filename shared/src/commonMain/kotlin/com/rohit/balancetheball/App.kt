@@ -12,6 +12,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.rohit.balancetheball.core.push.PendingInvite
 import com.rohit.balancetheball.core.push.PendingInviteHolder
 import com.rohit.balancetheball.core.theme.AppTheme
@@ -30,38 +34,28 @@ import com.rohit.balancetheball.presentation.history.HistoryScreen
 import com.rohit.balancetheball.presentation.invite.InviteResponseScreen
 import com.rohit.balancetheball.presentation.lobby.LobbyScreen
 import com.rohit.balancetheball.presentation.username.UsernameScreen
-import com.rohit.balancetheball.core.util.currentTimeMillis
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
-/**
- * navKey fields below exist only to give each *visit* to a re-enterable screen a distinct
- * viewModel() cache key. This app has no Navigation-Compose back stack (just this when block),
- * so every screen's viewModel {} would otherwise share one instance for the whole Activity
- * lifetime, keyed only by class name — meaning returning to a screen (e.g. Lobby, via Exit Game)
- * would hand back the same stale ViewModel from the previous visit instead of a fresh one.
- */
-private sealed interface AppRoute {
-    data object Loading : AppRoute
-    data class SignedOut(val navKey: Long = currentTimeMillis()) : AppRoute
-    data class NeedsUsername(val authUser: AuthUser) : AppRoute
-    data class InLobby(
-        val user: User,
-        val navKey: Long = currentTimeMillis(),
-        val pendingRoomCode: String? = null
-    ) : AppRoute
-    data class InRoom(val user: User, val roomCode: String) : AppRoute
-    data class InHistory(val user: User, val navKey: Long = currentTimeMillis()) : AppRoute
-    data class InviteResponse(val user: User, val invite: PendingInvite) : AppRoute
-}
-
-private fun currentUserOrNull(route: AppRoute): User? = when (route) {
-    is AppRoute.InLobby -> route.user
-    is AppRoute.InRoom -> route.user
-    is AppRoute.InHistory -> route.user
-    is AppRoute.InviteResponse -> route.user
-    else -> null
-}
+// Type-safe Navigation-Compose routes. Kept as plain data — screens still receive a real User/
+// AuthUser/PendingInvite reconstructed from these primitives at the call site below, so no
+// screen's own signature needs to change. Routes intentionally carry only IDs (uid/username),
+// not whole serialized domain objects, per Navigation's own type-safety guidance.
+@Serializable private object LoadingRoute
+@Serializable private object SignInRoute
+@Serializable private data class NeedsUsernameRoute(val authUid: String, val authEmail: String?, val authDisplayName: String?)
+@Serializable private data class LobbyRoute(val uid: String, val username: String, val pendingRoomCode: String? = null)
+@Serializable private data class GameRoute(val uid: String, val username: String, val roomCode: String)
+@Serializable private data class HistoryRoute(val uid: String, val username: String)
+@Serializable private data class InviteResponseRoute(
+    val uid: String,
+    val username: String,
+    val inviteId: String,
+    val fromUid: String,
+    val fromUsername: String,
+    val roomCode: String
+)
 
 @Composable
 @Preview
@@ -72,86 +66,124 @@ fun App(
     var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode()) }
 
     AppTheme(themeMode) {
-        var route by remember { mutableStateOf<AppRoute>(AppRoute.Loading) }
+        val navController = rememberNavController()
         val scope = rememberCoroutineScope()
+        var currentUser by remember { mutableStateOf<User?>(null) }
+
+        // Every transition in this app fully replaces the visible screen (there's no drill-down
+        // navigation to preserve) — clearing the whole back stack on each hop is what makes real
+        // Navigation-Compose ViewModel scoping actually kick in (the old entry, and its
+        // ViewModel, gets torn down when popped) instead of just adding unused history depth.
+        // Popping up to the *graph's own* id (not the start destination's) is what actually
+        // guarantees this clears everything: the start destination (LoadingRoute) only exists on
+        // the back stack for the very first hop, so anchoring to it stops working correctly the
+        // moment it's gone — the graph itself is always present regardless of current stack contents.
+        fun goTo(route: Any) {
+            navController.navigate(route) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+        }
 
         suspend fun resolveRoute(authUser: AuthUser) {
             val profile = userRepository.resolveProfile(authUser.uid).getOrNull()
-            route = if (profile != null) AppRoute.InLobby(profile) else AppRoute.NeedsUsername(authUser)
+            if (profile != null) {
+                currentUser = profile
+                goTo(LobbyRoute(profile.uid, profile.username))
+            } else {
+                goTo(NeedsUsernameRoute(authUser.uid, authUser.email, authUser.displayName))
+            }
         }
 
         // Firebase Auth persists sessions across cold starts, so a returning user skips SignInScreen entirely.
         LaunchedEffect(Unit) {
             val current = authRepository.currentUser
-            if (current == null) route = AppRoute.SignedOut() else resolveRoute(current)
+            if (current == null) goTo(SignInRoute) else resolveRoute(current)
         }
 
         // Handles both a cold start (app launched by tapping an invite notification, waiting for
         // sign-in to resolve) and a warm one (invite arrives while already signed in) — reacts to
-        // either the invite or the route changing, and only consumes it once a user is available.
+        // either the invite or the signed-in user changing, and only consumes it once both exist.
         LaunchedEffect(Unit) {
-            combine(snapshotFlow { route }, PendingInviteHolder.pending) { currentRoute, invite -> currentRoute to invite }
-                .collect { (currentRoute, invite) ->
-                    if (invite == null || currentRoute is AppRoute.InviteResponse) return@collect
-                    val user = currentUserOrNull(currentRoute) ?: return@collect
+            combine(snapshotFlow { currentUser }, PendingInviteHolder.pending) { user, invite -> user to invite }
+                .collect { (user, invite) ->
+                    if (user == null || invite == null) return@collect
                     PendingInviteHolder.pending.value = null
-                    route = AppRoute.InviteResponse(user, invite)
+                    goTo(
+                        InviteResponseRoute(
+                            uid = user.uid,
+                            username = user.username,
+                            inviteId = invite.inviteId,
+                            fromUid = invite.fromUid,
+                            fromUsername = invite.fromUsername,
+                            roomCode = invite.roomCode
+                        )
+                    )
                 }
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            when (val currentRoute = route) {
-                is AppRoute.Loading -> {
+            NavHost(navController = navController, startDestination = LoadingRoute) {
+                composable<LoadingRoute> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
-                is AppRoute.SignedOut -> {
-                    SignInScreen(
-                        navKey = currentRoute.navKey,
-                        onSignedIn = { authUser -> scope.launch { resolveRoute(authUser) } }
-                    )
+                composable<SignInRoute> {
+                    SignInScreen(onSignedIn = { authUser -> scope.launch { resolveRoute(authUser) } })
                 }
-                is AppRoute.NeedsUsername -> {
+                composable<NeedsUsernameRoute> { entry ->
+                    val route = entry.toRoute<NeedsUsernameRoute>()
                     UsernameScreen(
-                        authUser = currentRoute.authUser,
-                        onUsernameClaimed = { user -> route = AppRoute.InLobby(user) }
-                    )
-                }
-                is AppRoute.InLobby -> {
-                    LobbyScreen(
-                        user = currentRoute.user,
-                        navKey = currentRoute.navKey,
-                        initialRoomCode = currentRoute.pendingRoomCode,
-                        onRoomStarted = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) },
-                        onLoggedOut = { route = AppRoute.SignedOut() },
-                        onHistoryClick = { route = AppRoute.InHistory(currentRoute.user) }
-                    )
-                }
-                is AppRoute.InRoom -> {
-                    GameScreen(
-                        user = currentRoute.user,
-                        roomCode = currentRoute.roomCode,
-                        onExitGame = { route = AppRoute.InLobby(currentRoute.user) },
-                        onLoggedOut = { route = AppRoute.SignedOut() }
-                    )
-                }
-                is AppRoute.InHistory -> {
-                    HistoryScreen(
-                        user = currentRoute.user,
-                        navKey = currentRoute.navKey,
-                        onBack = { route = AppRoute.InLobby(currentRoute.user) },
-                        onInviteSent = { roomCode ->
-                            route = AppRoute.InLobby(currentRoute.user, pendingRoomCode = roomCode)
+                        authUser = AuthUser(route.authUid, route.authEmail, route.authDisplayName),
+                        onUsernameClaimed = { user ->
+                            currentUser = user
+                            goTo(LobbyRoute(user.uid, user.username))
                         }
                     )
                 }
-                is AppRoute.InviteResponse -> {
+                composable<LobbyRoute> { entry ->
+                    val route = entry.toRoute<LobbyRoute>()
+                    LobbyScreen(
+                        user = User(uid = route.uid, username = route.username),
+                        initialRoomCode = route.pendingRoomCode,
+                        onRoomStarted = { roomCode -> goTo(GameRoute(route.uid, route.username, roomCode)) },
+                        onLoggedOut = {
+                            currentUser = null
+                            goTo(SignInRoute)
+                        },
+                        onHistoryClick = { goTo(HistoryRoute(route.uid, route.username)) }
+                    )
+                }
+                composable<GameRoute> { entry ->
+                    val route = entry.toRoute<GameRoute>()
+                    GameScreen(
+                        user = User(uid = route.uid, username = route.username),
+                        roomCode = route.roomCode,
+                        onExitGame = { goTo(LobbyRoute(route.uid, route.username)) }
+                    )
+                }
+                composable<HistoryRoute> { entry ->
+                    val route = entry.toRoute<HistoryRoute>()
+                    HistoryScreen(
+                        user = User(uid = route.uid, username = route.username),
+                        onBack = { goTo(LobbyRoute(route.uid, route.username)) },
+                        onInviteSent = { roomCode ->
+                            goTo(LobbyRoute(route.uid, route.username, pendingRoomCode = roomCode))
+                        }
+                    )
+                }
+                composable<InviteResponseRoute> { entry ->
+                    val route = entry.toRoute<InviteResponseRoute>()
                     InviteResponseScreen(
-                        user = currentRoute.user,
-                        invite = currentRoute.invite,
-                        onJoined = { roomCode -> route = AppRoute.InRoom(currentRoute.user, roomCode) },
-                        onDismiss = { route = AppRoute.InLobby(currentRoute.user) }
+                        user = User(uid = route.uid, username = route.username),
+                        invite = PendingInvite(
+                            inviteId = route.inviteId,
+                            fromUid = route.fromUid,
+                            fromUsername = route.fromUsername,
+                            roomCode = route.roomCode
+                        ),
+                        onJoined = { roomCode -> goTo(GameRoute(route.uid, route.username, roomCode)) },
+                        onDismiss = { goTo(LobbyRoute(route.uid, route.username)) }
                     )
                 }
             }

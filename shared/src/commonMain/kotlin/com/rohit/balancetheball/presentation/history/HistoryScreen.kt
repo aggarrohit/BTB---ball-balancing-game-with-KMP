@@ -65,8 +65,7 @@ fun HistoryScreen(
     user: User,
     onBack: () -> Unit,
     onInviteSent: (roomCode: String) -> Unit,
-    navKey: Long = 0L,
-    viewModel: HistoryViewModel = viewModel(key = navKey.toString()) {
+    viewModel: HistoryViewModel = viewModel {
         // Manual dependency wiring — swap in a DI framework when needed
         HistoryViewModel(
             uid = user.uid,

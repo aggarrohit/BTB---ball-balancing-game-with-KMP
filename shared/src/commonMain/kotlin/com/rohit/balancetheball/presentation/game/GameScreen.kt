@@ -31,7 +31,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -56,18 +55,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.core.sensor.RequestStepPermission
 import com.rohit.balancetheball.core.sensor.StepCounter
 import com.rohit.balancetheball.core.sensor.TiltSensor
-import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
 import com.rohit.balancetheball.data.remote.FirebaseHistoryDataSource
 import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
 import com.rohit.balancetheball.data.repository.HistoryRepositoryImpl
 import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
-import com.rohit.balancetheball.domain.repository.AuthRepository
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.GlassCard
-import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -86,9 +82,7 @@ fun GameScreen(
     user: User,
     roomCode: String,
     onExitGame: () -> Unit,
-    onLoggedOut: () -> Unit,
-    authRepository: AuthRepository = remember { FirebaseAuthRepository() },
-    viewModel: GameViewModel = viewModel(key = roomCode) {
+    viewModel: GameViewModel = viewModel {
         // Manual dependency wiring — swap in a DI framework when needed
         GameViewModel(
             roomCode = roomCode,
@@ -103,9 +97,7 @@ fun GameScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val ballRadiusPx = with(density) { BALL_RADIUS.toPx() }
-    var showLogoutConfirm by remember { mutableStateOf(false) }
     var showExitConfirm by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
     RequestStepPermission { granted -> viewModel.onStepPermissionResult(granted) }
@@ -283,29 +275,8 @@ fun GameScreen(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            AnimatedOutlinedButton(onClick = { showLogoutConfirm = true }) { Text("Logout") }
             AnimatedOutlinedButton(onClick = { requestExitGame() }) { Text("Exit Game") }
         }
-    }
-
-    if (showLogoutConfirm) {
-        AlertDialog(
-            onDismissRequest = { showLogoutConfirm = false },
-            title = { Text("Log out?") },
-            text = { Text("You'll need to sign in again to play.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showLogoutConfirm = false
-                    coroutineScope.launch {
-                        authRepository.signOut()
-                        onLoggedOut()
-                    }
-                }) { Text("Log out") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }) { Text("Cancel") }
-            }
-        )
     }
 
     if (showExitConfirm) {

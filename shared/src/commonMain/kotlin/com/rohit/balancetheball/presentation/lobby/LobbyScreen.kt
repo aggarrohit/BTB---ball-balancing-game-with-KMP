@@ -41,10 +41,9 @@ fun LobbyScreen(
     onRoomStarted: (roomCode: String) -> Unit,
     onLoggedOut: () -> Unit,
     onHistoryClick: () -> Unit,
-    navKey: Long = 0L,
     initialRoomCode: String? = null,
     authRepository: AuthRepository = remember { FirebaseAuthRepository() },
-    viewModel: LobbyViewModel = viewModel(key = navKey.toString()) {
+    viewModel: LobbyViewModel = viewModel {
         // Manual dependency wiring — swap in a DI framework when needed
         val roomRepository = RoomRepositoryImpl(FirebaseRoomDataSource())
         LobbyViewModel(

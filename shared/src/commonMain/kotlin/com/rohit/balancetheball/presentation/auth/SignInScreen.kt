@@ -32,8 +32,7 @@ import com.rohit.balancetheball.presentation.common.GlassCard
 @Composable
 fun SignInScreen(
     onSignedIn: (AuthUser) -> Unit,
-    navKey: Long = 0L,
-    viewModel: AuthViewModel = viewModel(key = navKey.toString()) {
+    viewModel: AuthViewModel = viewModel {
         // Manual dependency wiring — swap in a DI framework when needed
         AuthViewModel(FirebaseAuthRepository())
     }
