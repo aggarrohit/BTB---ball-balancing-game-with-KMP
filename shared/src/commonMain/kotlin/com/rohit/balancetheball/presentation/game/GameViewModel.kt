@@ -383,7 +383,24 @@ class GameViewModel(
         var newX = current.ballX + velocityX * dtSeconds
         var newY = current.ballY + velocityY * dtSeconds
 
-        // Outer clamp keeps the ball on-screen even once it's fallen off the table (inner geometry below).
+        // Elimination must be judged against the ball's true (unclamped) position, before the
+        // on-screen clamp below has a chance to trap it — otherwise a table sized close to the
+        // canvas edge leaves less on-screen margin than the ball's own radius, so the screen-edge
+        // clamp stops the ball short of the table's true edge and it can never register as fallen.
+        val centerX = width / 2f
+        val centerY = height / 2f
+        val distanceFraction = max(
+            abs(newX - centerX) / (tableWidth / 2f),
+            abs(newY - centerY) / (tableHeight / 2f)
+        )
+
+        if (!localIsEliminated && distanceFraction > 1f) {
+            localIsEliminated = true
+            viewModelScope.launch { roomRepository.markEliminated(roomCode, uid) }
+        }
+
+        // Outer clamp keeps the ball visually on-screen even once it's fallen off the table — purely
+        // cosmetic now that elimination is judged above, on the true unclamped position.
         val minX = ballRadiusPx
         val maxX = width - ballRadiusPx
         val minY = ballRadiusPx
@@ -402,19 +419,6 @@ class GameViewModel(
         } else if (newY > maxY) {
             newY = maxY
             velocityY = 0f
-        }
-
-        // Table is centered within the full canvas, so its center coincides with the canvas center.
-        val centerX = width / 2f
-        val centerY = height / 2f
-        val distanceFraction = max(
-            abs(newX - centerX) / (tableWidth / 2f),
-            abs(newY - centerY) / (tableHeight / 2f)
-        )
-
-        if (!localIsEliminated && distanceFraction > 1f) {
-            localIsEliminated = true
-            viewModelScope.launch { roomRepository.markEliminated(roomCode, uid) }
         }
 
         // Rolling-without-slipping: for a sphere on a plane, the angular velocity is (surfaceNormal
