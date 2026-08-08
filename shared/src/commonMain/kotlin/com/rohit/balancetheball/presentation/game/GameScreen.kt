@@ -237,7 +237,7 @@ fun GameScreen(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = uiState.stepsUnavailableReason?.let { "Steps: unavailable ($it)" }
-                        ?: "Steps: ${uiState.stepCount}",
+                        ?: "Total Steps: ${uiState.stepCount} (${uiState.stepCount - uiState.validSteps } invalid steps)",
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
