@@ -13,6 +13,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNU
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Starts Koin before anything below can possibly resolve a dependency through it — mirrors
+        // Android's BalanceApplication.onCreate, which runs before its MainActivity for the same
+        // reason. Named doInitKoin, not initKoin, on the Swift side: Kotlin's Objective-C exporter
+        // prefixes any top-level function named init* with "do" to avoid colliding with Cocoa's
+        // own init-prefixed initializer convention.
+        KoinInitKt.doInitKoin()
+
         // Configure Firebase first — everything below (and IosAppConfigLoader/GoogleSignIn setup
         // that used to live in iOSApp.init()) depends on this having already run, and
         // @UIApplicationDelegateAdaptor doesn't guarantee this runs before the SwiftUI App's own

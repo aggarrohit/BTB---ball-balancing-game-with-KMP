@@ -8,25 +8,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.google.firebase.messaging.FirebaseMessaging
-import com.rohit.balancetheball.core.config.AppConfig
 import com.rohit.balancetheball.core.push.PendingInvite
 import com.rohit.balancetheball.core.push.PendingInviteHolder
 import com.rohit.balancetheball.core.push.PushTokenRegistrar
-import com.rohit.balancetheball.core.sensor.AndroidSensorContext
-import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
+import com.rohit.balancetheball.domain.repository.AuthRepository
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), KoinComponent {
+    private val authRepository: AuthRepository by inject()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Initialize config from BuildConfig (values injected from local.properties)
-        AppConfig.init(
-            databaseUrl = BuildConfig.FIREBASE_DATABASE_URL,
-            projectId = BuildConfig.FIREBASE_PROJECT_ID,
-            googleWebClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
-        )
-        AndroidSensorContext.init(applicationContext)
         registerCurrentPushToken()
         handleInviteIntent(intent)
 
@@ -43,7 +38,7 @@ class MainActivity : ComponentActivity() {
     /** onNewToken alone only fires on refresh/reinstall, not on every launch — this covers the rest. */
     private fun registerCurrentPushToken() {
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            val uid = FirebaseAuthRepository().currentUser?.uid ?: return@addOnSuccessListener
+            val uid = authRepository.currentUser?.uid ?: return@addOnSuccessListener
             PushTokenRegistrar.register(uid, token)
         }
     }

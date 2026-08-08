@@ -15,15 +15,18 @@ import com.google.firebase.messaging.RemoteMessage
 import com.rohit.balancetheball.MainActivity
 import com.rohit.balancetheball.R
 import com.rohit.balancetheball.core.push.PushTokenRegistrar
-import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
+import com.rohit.balancetheball.domain.repository.AuthRepository
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 private const val CHANNEL_ID = "game_invites"
 private const val NOTIFICATION_ID = 1001
 
-class BalanceFirebaseMessagingService : FirebaseMessagingService() {
+class BalanceFirebaseMessagingService : FirebaseMessagingService(), KoinComponent {
+    private val authRepository: AuthRepository by inject()
 
     override fun onNewToken(token: String) {
-        val uid = FirebaseAuthRepository().currentUser?.uid ?: return
+        val uid = authRepository.currentUser?.uid ?: return
         PushTokenRegistrar.register(uid, token)
     }
 

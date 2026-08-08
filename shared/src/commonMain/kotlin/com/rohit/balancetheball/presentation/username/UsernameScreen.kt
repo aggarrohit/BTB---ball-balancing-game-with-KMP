@@ -12,15 +12,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rohit.balancetheball.data.remote.FirebaseUserDataSource
-import com.rohit.balancetheball.data.repository.UserRepositoryImpl
 import com.rohit.balancetheball.domain.model.AuthUser
 import com.rohit.balancetheball.domain.model.User
-import com.rohit.balancetheball.domain.usecase.ClaimUsernameUseCase
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AppBackground
 import com.rohit.balancetheball.presentation.common.GlassCard
+import org.koin.compose.viewmodel.koinViewModel
 
 private fun suggestUsername(displayName: String?): String =
     displayName.orEmpty().filter { it.isLetterOrDigit() || it == '_' }.take(20)
@@ -29,13 +26,7 @@ private fun suggestUsername(displayName: String?): String =
 fun UsernameScreen(
     authUser: AuthUser,
     onUsernameClaimed: (user: User) -> Unit,
-    viewModel: UsernameViewModel = viewModel {
-        // Manual dependency wiring — swap in a DI framework when needed
-        val dataSource = FirebaseUserDataSource()
-        val repository = UserRepositoryImpl(dataSource)
-        val useCase = ClaimUsernameUseCase(repository)
-        UsernameViewModel(useCase)
-    }
+    viewModel: UsernameViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 

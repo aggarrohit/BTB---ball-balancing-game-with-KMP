@@ -13,16 +13,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
-import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
-import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.Room
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.repository.AuthRepository
 import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
-import com.rohit.balancetheball.domain.usecase.JoinRoomUseCase
 import com.rohit.balancetheball.domain.model.Room.Companion.DEFAULT_PROGRESS_VALID_DISTANCE_PERCENT
 import com.rohit.balancetheball.core.push.RequestNotificationPermission
 import com.rohit.balancetheball.core.util.exitApp
@@ -31,6 +26,9 @@ import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.AppBackground
 import com.rohit.balancetheball.presentation.common.GlassCard
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 private enum class LobbyTab { CREATE, JOIN }
 
@@ -42,19 +40,8 @@ fun LobbyScreen(
     onLoggedOut: () -> Unit,
     onHistoryClick: () -> Unit,
     initialRoomCode: String? = null,
-    authRepository: AuthRepository = remember { FirebaseAuthRepository() },
-    viewModel: LobbyViewModel = viewModel {
-        // Manual dependency wiring — swap in a DI framework when needed
-        val roomRepository = RoomRepositoryImpl(FirebaseRoomDataSource())
-        LobbyViewModel(
-            createRoomUseCase = CreateRoomUseCase(roomRepository),
-            joinRoomUseCase = JoinRoomUseCase(roomRepository),
-            roomRepository = roomRepository,
-            uid = user.uid,
-            username = user.username,
-            initialRoomCode = initialRoomCode
-        )
-    }
+    authRepository: AuthRepository = koinInject(),
+    viewModel: LobbyViewModel = koinViewModel { parametersOf(user.uid, user.username, initialRoomCode) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutConfirm by remember { mutableStateOf(false) }

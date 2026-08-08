@@ -19,18 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.core.push.PendingInvite
-import com.rohit.balancetheball.data.remote.FirebaseInviteDataSource
-import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
-import com.rohit.balancetheball.data.repository.InviteRepositoryImpl
-import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.User
-import com.rohit.balancetheball.domain.usecase.JoinRoomUseCase
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.AppBackground
 import com.rohit.balancetheball.presentation.common.GlassCard
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun InviteResponseScreen(
@@ -38,16 +34,7 @@ fun InviteResponseScreen(
     invite: PendingInvite,
     onJoined: (roomCode: String) -> Unit,
     onDismiss: () -> Unit,
-    viewModel: InviteResponseViewModel = viewModel {
-        // Manual dependency wiring — swap in a DI framework when needed
-        InviteResponseViewModel(
-            uid = user.uid,
-            username = user.username,
-            invite = invite,
-            joinRoomUseCase = JoinRoomUseCase(RoomRepositoryImpl(FirebaseRoomDataSource())),
-            inviteRepository = InviteRepositoryImpl(FirebaseInviteDataSource())
-        )
-    }
+    viewModel: InviteResponseViewModel = koinViewModel { parametersOf(user.uid, user.username, invite) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
