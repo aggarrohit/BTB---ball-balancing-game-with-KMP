@@ -20,9 +20,6 @@ import com.rohit.balancetheball.core.push.PendingInvite
 import com.rohit.balancetheball.core.push.PendingInviteHolder
 import com.rohit.balancetheball.core.theme.AppTheme
 import com.rohit.balancetheball.core.theme.ThemePreferences
-import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
-import com.rohit.balancetheball.data.remote.FirebaseUserDataSource
-import com.rohit.balancetheball.data.repository.UserRepositoryImpl
 import com.rohit.balancetheball.domain.model.AuthUser
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.domain.repository.AuthRepository
@@ -37,6 +34,7 @@ import com.rohit.balancetheball.presentation.username.UsernameScreen
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 // Type-safe Navigation-Compose routes. Kept as plain data — screens still receive a real User/
 // AuthUser/PendingInvite reconstructed from these primitives at the call site below, so no
@@ -60,8 +58,8 @@ import kotlinx.serialization.Serializable
 @Composable
 @Preview
 fun App(
-    authRepository: AuthRepository = remember { FirebaseAuthRepository() },
-    userRepository: UserRepository = remember { UserRepositoryImpl(FirebaseUserDataSource()) }
+    authRepository: AuthRepository = koinInject(),
+    userRepository: UserRepository = koinInject()
 ) {
     var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode()) }
 

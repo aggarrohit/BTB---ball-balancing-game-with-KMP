@@ -51,19 +51,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rohit.balancetheball.core.sensor.RequestStepPermission
-import com.rohit.balancetheball.core.sensor.StepCounter
-import com.rohit.balancetheball.core.sensor.TiltSensor
-import com.rohit.balancetheball.data.remote.FirebaseHistoryDataSource
-import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
-import com.rohit.balancetheball.data.repository.HistoryRepositoryImpl
-import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.RoomStatus
 import com.rohit.balancetheball.domain.model.User
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.GlassCard
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -82,17 +77,7 @@ fun GameScreen(
     user: User,
     roomCode: String,
     onExitGame: () -> Unit,
-    viewModel: GameViewModel = viewModel {
-        // Manual dependency wiring — swap in a DI framework when needed
-        GameViewModel(
-            roomCode = roomCode,
-            uid = user.uid,
-            tiltSensor = TiltSensor(),
-            stepCounter = StepCounter(),
-            roomRepository = RoomRepositoryImpl(FirebaseRoomDataSource()),
-            historyRepository = HistoryRepositoryImpl(FirebaseHistoryDataSource())
-        )
-    }
+    viewModel: GameViewModel = koinViewModel { parametersOf(roomCode, user.uid) }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val density = LocalDensity.current

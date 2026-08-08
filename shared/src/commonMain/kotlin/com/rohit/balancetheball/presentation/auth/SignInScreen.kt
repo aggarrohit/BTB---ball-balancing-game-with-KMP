@@ -21,21 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rohit.balancetheball.data.auth.FirebaseAuthRepository
 import com.rohit.balancetheball.domain.model.AuthUser
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AppBackground
 import com.rohit.balancetheball.presentation.common.BallLogoImage
 import com.rohit.balancetheball.presentation.common.GlassCard
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SignInScreen(
     onSignedIn: (AuthUser) -> Unit,
-    viewModel: AuthViewModel = viewModel {
-        // Manual dependency wiring — swap in a DI framework when needed
-        AuthViewModel(FirebaseAuthRepository())
-    }
+    viewModel: AuthViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val launchGoogleSignIn = rememberGoogleSignIn { credential, error ->

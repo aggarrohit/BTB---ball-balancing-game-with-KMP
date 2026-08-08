@@ -29,6 +29,11 @@ dependencies {
     // handling, so it's wired natively here rather than through the shared KMP Firebase SDK.
     implementation(platform(libs.firebase.bom))
     implementation("com.google.firebase:firebase-messaging")
+
+    // MainActivity and BalanceFirebaseMessagingService resolve dependencies via KoinComponent —
+    // shared's own Koin dependency isn't transitively visible here (Gradle's `implementation` is
+    // deliberately non-transitive), so it needs to be declared again for this module directly.
+    implementation(libs.koin.core)
 }
 
 android {

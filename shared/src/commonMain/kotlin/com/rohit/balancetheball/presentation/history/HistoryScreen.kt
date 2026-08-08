@@ -37,18 +37,10 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rohit.balancetheball.data.remote.FirebaseHistoryDataSource
-import com.rohit.balancetheball.data.remote.FirebaseInviteDataSource
-import com.rohit.balancetheball.data.remote.FirebaseRoomDataSource
-import com.rohit.balancetheball.data.repository.HistoryRepositoryImpl
-import com.rohit.balancetheball.data.repository.InviteRepositoryImpl
-import com.rohit.balancetheball.data.repository.RoomRepositoryImpl
 import com.rohit.balancetheball.domain.model.GameHistoryEntry
 import com.rohit.balancetheball.domain.model.GameResult
 import com.rohit.balancetheball.domain.model.OpponentSummary
 import com.rohit.balancetheball.domain.model.User
-import com.rohit.balancetheball.domain.usecase.CreateRoomUseCase
 import com.rohit.balancetheball.presentation.common.AnimatedButton
 import com.rohit.balancetheball.presentation.common.AnimatedOutlinedButton
 import com.rohit.balancetheball.presentation.common.AppBackground
@@ -56,6 +48,8 @@ import com.rohit.balancetheball.presentation.common.GlassCard
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 private enum class HistoryTab { GAMES, OPPONENTS }
 
@@ -65,16 +59,7 @@ fun HistoryScreen(
     user: User,
     onBack: () -> Unit,
     onInviteSent: (roomCode: String) -> Unit,
-    viewModel: HistoryViewModel = viewModel {
-        // Manual dependency wiring — swap in a DI framework when needed
-        HistoryViewModel(
-            uid = user.uid,
-            username = user.username,
-            historyRepository = HistoryRepositoryImpl(FirebaseHistoryDataSource()),
-            createRoomUseCase = CreateRoomUseCase(RoomRepositoryImpl(FirebaseRoomDataSource())),
-            inviteRepository = InviteRepositoryImpl(FirebaseInviteDataSource())
-        )
-    }
+    viewModel: HistoryViewModel = koinViewModel { parametersOf(user.uid, user.username) }
 ) {
     var tab by remember { mutableStateOf(HistoryTab.GAMES) }
     val gameHistoryState by viewModel.gameHistoryState.collectAsStateWithLifecycle()
